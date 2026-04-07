@@ -64,7 +64,7 @@ def train_model(args):
     os.makedirs(args.model_dir, exist_ok=True)
     best_val_loss = float('inf')
     
-    print("\n[INFO] Starting Training Loop...")
+    print("\n[INFO] Starting Seizure Risk Model Training Loop...")
     for epoch in range(1, args.epochs + 1):
         # -- TRAIN STAGE --
         model.train()
@@ -73,7 +73,7 @@ def train_model(args):
         total = 0
         
         # tqdm for pretty Colab logging
-        pbar = tqdm(train_loader, desc=f"Epoch {epoch}/{args.epochs} [TRAIN]")
+        pbar = tqdm(train_loader, desc=f"Epoch {epoch}/{args.epochs} [TRAIN RISK]")
         for batch_idx, (inputs, targets) in enumerate(pbar):
             inputs, targets = inputs.to(device), targets.to(device)
             
@@ -114,7 +114,7 @@ def train_model(args):
         v_total = 0
         
         with torch.no_grad():
-            vpbar = tqdm(val_loader, desc=f"Epoch {epoch}/{args.epochs} [VAL]")
+            vpbar = tqdm(val_loader, desc=f"Epoch {epoch}/{args.epochs} [VAL RISK]")
             for inputs, targets in vpbar:
                 inputs, targets = inputs.to(device), targets.to(device)
                 
@@ -134,7 +134,7 @@ def train_model(args):
                 
         avg_val_loss = val_loss / len(val_loader)
         val_acc = 100. * v_correct / v_total
-        print(f"--- Epoch {epoch} Results: Val Loss: {avg_val_loss:.4f} | Val Acc: {val_acc:.2f}% ---")
+        print(f"--- Epoch {epoch} Results: Val Risk Loss: {avg_val_loss:.4f} | Val Risk Acc: {val_acc:.2f}% ---")
         
         # Checkpointing
         if avg_val_loss < best_val_loss:

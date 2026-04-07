@@ -99,6 +99,7 @@ async def upload_file(file: UploadFile = File(...)):
         
         # Inference
         predict_seizure = False
+        max_seizure_prob = 0.0
         with torch.no_grad():
             for i in range(n_epochs):
                 # Shape: (1, 18, 2400)
@@ -108,14 +109,27 @@ async def upload_file(file: UploadFile = File(...)):
                 outputs = model(x_tensor)
                 probs = torch.nn.functional.softmax(outputs, dim=1)
                 
+                seizure_prob = probs[0, 1].item()
+                if seizure_prob > max_seizure_prob:
+                    max_seizure_prob = seizure_prob
+                
                 # Use a lowered sensitivity threshold of 5% because seizure events are heavily imbalanced.
-                if probs[0, 1].item() > 0.05:
+                if seizure_prob > 0.05:
                     predict_seizure = True
-                    break
+                    # We continue the loop instead of breaking so we can find exactly the max probability across the file
                     
         result = "seizure" if predict_seizure else "healthy"
+        # Convert to percentage
+        risk_percentage = round(max_seizure_prob * 100, 2)
+        seizure_type = "Generalized Seizure Event" if predict_seizure else "None"
 
-        return JSONResponse(status_code=200, content={"message": "Inference complete.", "filename": file.filename, "result": result})
+        return JSONResponse(status_code=200, content={
+            "message": "Inference complete.", 
+            "filename": file.filename, 
+            "result": result,
+            "risk_score": risk_percentage,
+            "seizure_type": seizure_type
+        })
     except HTTPException:
         raise
     except Exception as e:
