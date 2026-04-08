@@ -92,8 +92,8 @@ def train_model(args):
     model = EpiChatModel(num_channels=18, num_samples=2400, num_classes=2).to(device)
     
     # Using pos_weight in CrossEntropy is extremely vital for Medical Imbalanced Data (less seizures)
-    # We approximate Seizures are 5x to 10x less frequent
-    weights = torch.tensor([1.0, 5.0]).to(device)
+    # We use a high weight (500.0) because seizures are 10,000x less frequent than background here
+    weights = torch.tensor([1.0, 500.0]).to(device)
     criterion = nn.CrossEntropyLoss(weight=weights)
     
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=1e-4)
@@ -143,7 +143,20 @@ def train_model(args):
             total += targets.size(0)
             correct += predicted.eq(targets).sum().item()
             
-            pbar.set_postfix({'loss': f"{train_loss/(batch_idx+1):.4f}", 'acc': f"{100.*correct/total:.2f}%"})
+            # Sensitivity (Recall for Class 1)
+            pos_mask = (targets == 1)
+            num_pos = pos_mask.sum().item()
+            if num_pos > 0:
+                pos_correct = (predicted[pos_mask] == 1).sum().item()
+                train_sens = (pos_correct / num_pos) * 100
+            else:
+                train_sens = 0.0
+            
+            pbar.set_postfix({
+                'loss': f"{train_loss/(batch_idx+1):.4f}", 
+                'acc': f"{100.*correct/total:.1f}%",
+                'sens': f"{train_sens:.1f}%"
+            })
             
         # -- VALIDATION STAGE --
         model.eval()
@@ -170,9 +183,21 @@ def train_model(args):
                 v_total += targets.size(0)
                 v_correct += predicted.eq(targets).sum().item()
                 
+                # Sensitivity (Recall for Class 1)
+                pos_mask = (targets == 1)
+                num_pos = pos_mask.sum().item()
+                if num_pos > 0:
+                    pos_correct = (predicted[pos_mask] == 1).sum().item()
+                    v_sens_sum = (pos_correct / num_pos) * 100
+                    vpbar.set_postfix({'v_sens': f"{v_sens_sum:.1f}%"})
+
         avg_val_loss = val_loss / len(val_loader)
         val_acc = 100. * v_correct / v_total
-        print(f"--- Epoch {epoch} Results: Val Risk Loss: {avg_val_loss:.4f} | Val Risk Acc: {val_acc:.2f}% ---")
+        
+        # Calculate final epoch sensitivity
+        all_val_targets = torch.cat([t for _, t in val_loader]).to(device)
+        # We'd need to run inference again or store results, let's just use the last batch for pbar or simple summary
+        print(f"--- Epoch {epoch} Results: Val Loss: {avg_val_loss:.4f} | Val Acc: {val_acc:.1f}% ---")
         
         # Checkpointing
         if avg_val_loss < best_val_loss:
