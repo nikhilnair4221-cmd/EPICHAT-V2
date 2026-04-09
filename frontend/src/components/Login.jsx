@@ -10,7 +10,11 @@ export default function Login() {
 
   const handleLogin = (e) => {
     e.preventDefault();
-    navigate('/dashboard');
+    const username = (email || '').trim().toLowerCase();
+    localStorage.setItem('epichat_role', role);
+    localStorage.setItem('epichat_username', username);
+    if (role === 'doctor') navigate('/doctor');
+    else navigate('/patient');
   };
 
   return (

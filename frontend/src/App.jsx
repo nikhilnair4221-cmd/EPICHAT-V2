@@ -1,7 +1,8 @@
 import React from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
-import Dashboard from './components/Dashboard'
 import Login from './components/Login'
+import PatientDashboard from './components/PatientDashboard'
+import DoctorDashboard from './components/DoctorDashboard'
 
 function App() {
   return (
@@ -10,7 +11,9 @@ function App() {
         <Routes>
           <Route path="/" element={<Navigate to="/login" replace />} />
           <Route path="/login" element={<Login />} />
-          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/patient" element={<PatientDashboard />} />
+          <Route path="/doctor" element={<DoctorDashboard />} />
+          <Route path="/dashboard" element={<Navigate to="/login" replace />} />
         </Routes>
       </div>
     </Router>

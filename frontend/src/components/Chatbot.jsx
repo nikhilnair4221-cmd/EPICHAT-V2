@@ -1,6 +1,21 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, Bot } from 'lucide-react';
 
+function TypingText({ text, speedMs = 16 }) {
+  const [shown, setShown] = useState('');
+  useEffect(() => {
+    setShown('');
+    let i = 0;
+    const id = setInterval(() => {
+      i += 1;
+      setShown(text.slice(0, i));
+      if (i >= text.length) clearInterval(id);
+    }, speedMs);
+    return () => clearInterval(id);
+  }, [text, speedMs]);
+  return <>{shown}</>;
+}
+
 export default function Chatbot() {
   const [messages, setMessages] = useState([
     { id: 1, sender: 'ai', text: "Hello! I'm the EpiChat AI assistant. I can help interpret EEG results or provide general information about epilepsy. How can I help you today?" }
@@ -20,11 +35,11 @@ export default function Chatbot() {
     setMessages(prev => [...prev, newMsg]);
     setInputVal('');
 
-    // Mock AI response
+    // Demo AI response (typing animation makes it visible)
     setTimeout(() => {
       setMessages(prev => [
         ...prev, 
-        { id: Date.now()+1, sender: 'ai', text: "That's a great question! Our AI model analyzes the uploaded EEG signals searching for specific waveform spikes that indicate seizures. Based on your current session data, we are ready for the next test." }
+        { id: Date.now()+1, sender: 'ai', text: "I can summarize the result (Normal / Pre-ictal / Ictal), explain what the risk % means, and suggest next steps. If you share symptoms + timeline, I’ll generate a doctor-friendly report summary." }
       ]);
     }, 1200);
   };
@@ -40,7 +55,7 @@ export default function Chatbot() {
         {messages.map(msg => (
           <div key={msg.id} className={`chat-message-row ${msg.sender}`}>
             <div className={`chat-bubble ${msg.sender}-bubble`}>
-              {msg.text}
+              {msg.sender === 'ai' ? <TypingText text={msg.text} /> : msg.text}
             </div>
           </div>
         ))}
