@@ -26,7 +26,7 @@ export default function BrainHeatmap({ seizureChannels = [] }) {
 
   return (
     <div className="glass-panel" style={{ padding: 12 }}>
-      <div className="neon-text" style={{ fontWeight: 700 }}>Electrode Activity Map</div>
+      <div className="neon-text" style={{ fontWeight: 700 }}>🧩 Electrode Activity Map</div>
       <div style={{ color: 'var(--text-secondary)', fontSize: 12, marginTop: 4 }}>Topographic preview (schematic)</div>
       <svg viewBox="0 0 100 100" style={{ width: '100%', height: 180, marginTop: 10 }}>
         <defs>

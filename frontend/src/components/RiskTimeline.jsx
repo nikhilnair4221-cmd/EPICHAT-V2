@@ -9,8 +9,11 @@ export default function RiskTimeline({ riskSeries = [], playhead = 0 }) {
   return (
     <div className="glass-panel" style={{ padding: 12 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-        <div className="neon-text" style={{ fontWeight: 700 }}>Risk Prediction Timeline</div>
+        <div className="neon-text" style={{ fontWeight: 700 }}>📈 Risk Prediction Timeline</div>
         <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>Low → Elevated → High → Seizure</div>
+      </div>
+      <div style={{ color: 'var(--text-secondary)', fontSize: '0.78rem', marginTop: 4, lineHeight: 1.5 }}>
+        Shows predicted seizure probability over time. Each point represents a 12-second EEG window analyzed by the BIOT + EEGNet model.
       </div>
       <div style={{ width: '100%', height: 180, marginTop: 10 }}>
         <ResponsiveContainer width="100%" height="100%">
@@ -29,6 +32,21 @@ export default function RiskTimeline({ riskSeries = [], playhead = 0 }) {
             <Line type="monotone" dataKey="risk" stroke="#00F5FF" strokeWidth={2} dot={false} />
           </LineChart>
         </ResponsiveContainer>
+      </div>
+      {/* Threshold legend */}
+      <div style={{ display: 'flex', gap: 16, marginTop: 8, flexWrap: 'wrap', color: 'var(--text-secondary)', fontSize: 12, alignItems: 'center' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+          <span style={{ width: 14, height: 2, background: 'rgba(234,179,8,0.6)', display: 'inline-block', borderRadius: 1 }} />
+          <span>20% Pre-ictal threshold</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+          <span style={{ width: 14, height: 2, background: 'rgba(255,42,42,0.6)', display: 'inline-block', borderRadius: 1 }} />
+          <span>50% Seizure threshold</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+          <span style={{ width: 14, height: 2, background: '#00F5FF', display: 'inline-block', borderRadius: 1 }} />
+          <span>Risk score</span>
+        </div>
       </div>
     </div>
   );

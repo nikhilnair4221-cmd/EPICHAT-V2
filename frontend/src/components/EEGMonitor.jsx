@@ -144,7 +144,7 @@ export default function EEGMonitor({
   return (
     <div className="glass-panel" style={{ padding: 12 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12 }}>
-        <div className="neon-text" style={{ fontWeight: 700 }}>Live EEG Monitor</div>
+        <div className="neon-text" style={{ fontWeight: 700 }}>〰️ Live EEG Monitor</div>
         <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>
           {isLive ? 'Streaming preview' : 'Snapshot preview'}
         </div>
@@ -152,8 +152,20 @@ export default function EEGMonitor({
       <div style={{ marginTop: 10, width: '100%' }}>
         <canvas ref={canvasRef} style={{ width: '100%', height }} />
       </div>
-      <div style={{ marginTop: 8, display: 'flex', gap: 10, flexWrap: 'wrap', color: 'var(--text-secondary)', fontSize: 12 }}>
-        <div><span style={{ color: '#ff2a2a', fontWeight: 700 }}>Red</span> = detected seizure zone channels</div>
+      <div style={{ marginTop: 8, display: 'flex', gap: 14, flexWrap: 'wrap', color: 'var(--text-secondary)', fontSize: 12, alignItems: 'center' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+          <span style={{ width: 18, height: 3, background: '#22c55e', borderRadius: 2, display: 'inline-block' }} />
+          <span>Normal</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+          <span style={{ width: 18, height: 3, background: '#eab308', borderRadius: 2, display: 'inline-block' }} />
+          <span>Irregular</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+          <span style={{ width: 18, height: 3, background: '#ff2a2a', borderRadius: 2, display: 'inline-block', boxShadow: '0 0 6px rgba(255,42,42,0.6)' }} />
+          <span>High Risk (seizure zone)</span>
+        </div>
+        <span style={{ opacity: 0.5 }}>|</span>
         <div><span style={{ color: '#00F5FF', fontWeight: 700 }}>Cyan grid</span> = time scale</div>
       </div>
     </div>

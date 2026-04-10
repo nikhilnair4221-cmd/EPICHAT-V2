@@ -1,13 +1,23 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import sys
+import os
 from pathlib import Path
+
+# Load .env file from backend root (one level up from app/)
+_env_path = Path(__file__).resolve().parent.parent / ".env"
+if _env_path.exists():
+    for line in _env_path.read_text().splitlines():
+        line = line.strip()
+        if line and not line.startswith("#") and "=" in line:
+            key, _, val = line.partition("=")
+            os.environ.setdefault(key.strip(), val.strip())
 
 # Fix python parsing path
 sys.path.append(str(Path(__file__).parent))
 
 from routers import upload
-from routers import patient, doctor
+from routers import patient, doctor, chat
 from db import init_db
 
 app = FastAPI(title="EpiChat Inference API", version="2.0")
@@ -28,6 +38,7 @@ app.add_middleware(
 app.include_router(upload.router)
 app.include_router(patient.router)
 app.include_router(doctor.router)
+app.include_router(chat.router)
 
 
 @app.on_event("startup")
