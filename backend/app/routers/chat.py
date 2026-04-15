@@ -1,6 +1,5 @@
 """
-/api/chat  —  OpenAI proxy endpoint
-Keeps the API key on the server; the frontend never sees it.
+/api/chat  —  AI proxy endpoint with support for both Gemini and OpenAI
 """
 from __future__ import annotations
 
@@ -8,64 +7,96 @@ import os
 import httpx
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from typing import List
+from typing import List, Dict, Any
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 
 OPENAI_API_URL = "https://api.openai.com/v1/chat/completions"
-MODEL           = "gpt-4o-mini"
+OPENAI_MODEL   = "gpt-4o-mini"
+GEMINI_MODEL   = "gemini-flash-latest"
 
 SYSTEM_PROMPT = (
-    "You are EpiChat AI, a helpful assistant that explains EEG results, "
-    "epileptic seizure risk, precautions, and general medical information. "
-    "You help patients understand their EEG reports, explain what seizure "
-    "classifications mean, give first-aid steps for seizures, and provide "
-    "general epilepsy lifestyle guidance. "
-    "Always be clear, compassionate, and easy to understand. Keep responses "
-    "concise and well-structured. Use bullet points where helpful. "
-    "⚠️ Medical Disclaimer: You are not a doctor. All information is "
-    "educational only. Always advise the user to consult a qualified "
-    "neurologist for diagnosis and treatment."
+    "You are EpiChat AI. Explain EEG results and epilepsy precautions. "
+    "You are not a doctor. Always include disclaimer."
 )
 
-
-class ChatMessage(BaseModel):
-    role: str   # "user" | "assistant"
-    content: str
-
-
 class ChatRequest(BaseModel):
-    messages: List[ChatMessage]
-
+    message: str
+    history: List[Dict[str, Any]] = []
 
 class ChatResponse(BaseModel):
     reply: str
 
-
 @router.post("", response_model=ChatResponse)
 async def chat(req: ChatRequest):
-    api_key = os.getenv("OPENAI_API_KEY", "")
+    gemini_key = os.getenv("GEMINI_API_KEY", "")
+    openai_key = os.getenv("OPENAI_API_KEY", "")
 
-    if not api_key or api_key == "YOUR_KEY_HERE":
-        raise HTTPException(
-            status_code=503,
-            detail="OpenAI API key not configured. Set OPENAI_API_KEY in backend environment."
-        )
+    # 1) Try Google Gemini API First (Free tier friendly)
+    if gemini_key and gemini_key != "AIzaSyAW0idFYOQ1XjLQXwNONICtzPYNoo1nfXQ":
+        gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent?key={gemini_key}"
+        
+        contents = []
+        for m in req.history:
+            role = "model" if m.get("role") == "assistant" else "user"
+            text = m.get("text", m.get("content", ""))
+            contents.append({"role": role, "parts": [{"text": text}]})
+            
+        contents.append({"role": "user", "parts": [{"text": req.message}]})
+        
+        payload = {
+            "systemInstruction": {"parts": [{"text": SYSTEM_PROMPT}]},
+            "contents": contents,
+            "generationConfig": {
+                "temperature": 0.7,
+                "maxOutputTokens": 500
+            }
+        }
+        
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                resp = await client.post(gemini_url, json=payload)
+                resp.raise_for_status()
+                data = resp.json()
+                reply = data["candidates"][0]["content"]["parts"][0]["text"]
+                return ChatResponse(reply=reply)
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 429:
+                return ChatResponse(reply="🤖 [Mock Mode] Google Gemini rate limit exceeded. Please try again later.")
+            if e.response.status_code == 400:
+                return ChatResponse(reply="🤖 [Mock Mode] Invalid request to Gemini API. Please check your API key and setup.")
+            body = e.response.json() if e.response.content else {}
+            msg  = body.get("error", {}).get("message", str(e))
+            raise HTTPException(status_code=e.response.status_code, detail=f"Gemini error: {msg}")
+        except httpx.RequestError as e:
+            return ChatResponse(reply=f"🤖 [Mock Mode] Network error reaching Gemini: {e}")
 
-    # Build messages with system prompt prepended
+    # 2) Fallback to OpenAI API
+    if not openai_key:
+        return ChatResponse(reply="🤖 [Mock Mode] Please add an OPENAI_API_KEY to the .env file for OpenAI fallback.")
+
+    # Build messages with system prompt prepended for OpenAI
     messages = [{"role": "system", "content": SYSTEM_PROMPT}]
-    for m in req.messages:
-        messages.append({"role": m.role, "content": m.content})
+    
+    # Append history
+    for m in req.history:
+        messages.append({
+            "role": "assistant" if m.get("role") == "assistant" else "user",
+            "content": m.get("text", m.get("content", ""))
+        })
+        
+    # Append latest message
+    messages.append({"role": "user", "content": req.message})
 
     payload = {
-        "model": MODEL,
+        "model": OPENAI_MODEL,
         "messages": messages,
         "max_tokens": 500,
         "temperature": 0.7,
     }
 
     headers = {
-        "Authorization": f"Bearer {api_key}",
+        "Authorization": f"Bearer {openai_key}",
         "Content-Type": "application/json",
     }
 
@@ -78,8 +109,12 @@ async def chat(req: ChatRequest):
             return ChatResponse(reply=reply)
 
     except httpx.HTTPStatusError as e:
+        if e.response.status_code == 429:
+            return ChatResponse(reply="🤖 [Mock Mode] OpenAI API rate limit exceeded (Quota exhausted). Please check your OpenAI billing details or try again later.")
+        if e.response.status_code == 401:
+            return ChatResponse(reply="🤖 [Mock Mode] Invalid OpenAI API key. Please check the key in your .env file.")
         body = e.response.json() if e.response.content else {}
         msg  = body.get("error", {}).get("message", str(e))
         raise HTTPException(status_code=e.response.status_code, detail=f"OpenAI error: {msg}")
     except httpx.RequestError as e:
-        raise HTTPException(status_code=503, detail=f"Network error reaching OpenAI: {e}")
+        return ChatResponse(reply=f"🤖 [Mock Mode] Network error reaching OpenAI: {e}")

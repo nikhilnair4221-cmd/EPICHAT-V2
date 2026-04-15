@@ -2,16 +2,8 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Brain, Mail, Lock, User, ArrowRight, Eye, EyeOff, AlertCircle } from 'lucide-react';
 
-// ── tiny user-store (localStorage keyed by username) ──────────────────────
-function saveUser({ username, email, password }) {
-  try {
-    const all = JSON.parse(localStorage.getItem('epichat_users') || '{}');
-    if (!all[username]) {
-      all[username] = { username, email, password, history: [], createdAt: new Date().toISOString() };
-      localStorage.setItem('epichat_users', JSON.stringify(all));
-    }
-  } catch (_) {}
-}
+// ── local helper removed dynamically ──────────────────────
+import { API_BASE } from '../lib/api';
 
 function validateEmail(val) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val);
@@ -33,19 +25,46 @@ export default function Login() {
     return errs;
   };
 
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
     const errs = validate();
     if (Object.keys(errs).length) { setErrors(errs); return; }
     setErrors({});
 
     const user = username.trim().toLowerCase();
-    saveUser({ username: user, email: email.trim().toLowerCase(), password });
 
-    localStorage.setItem('epichat_username', user);
-    localStorage.setItem('epichat_email',    email.trim().toLowerCase());
-    localStorage.setItem('epichat_role',     'patient');
-    navigate('/dashboard');
+    try {
+      const btn = document.getElementById('login-submit');
+      if (btn) btn.innerHTML = 'Connecting...';
+      
+      const res = await fetch(`${API_BASE}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: user,
+          email: email.trim().toLowerCase(),
+          password: password
+        })
+      });
+
+      if (!res.ok) {
+        let msg = 'Unable to load user data';
+        try { const j = await res.json(); if (j.detail) msg = j.detail; } catch (e) {}
+        throw new Error(msg);
+      }
+
+      const data = await res.json();
+      localStorage.setItem('epichat_token', data.access_token);
+      localStorage.setItem('epichat_username', data.username);
+      localStorage.setItem('epichat_email', email.trim().toLowerCase());
+      localStorage.setItem('epichat_role', 'patient');
+      navigate('/dashboard');
+      
+    } catch (err) {
+      setErrors({ password: err.message });
+      const btn = document.getElementById('login-submit');
+      if (btn) btn.innerHTML = 'Enter EpiChat Portal';
+    }
   };
 
   return (

@@ -16,13 +16,9 @@ import {
   Zap,
   Brain,
 } from 'lucide-react';
+import { API_BASE } from '../lib/api';
 
 // ── helpers ─────────────────────────────────────────────────────────────────
-function getHistory() {
-  try {
-    return JSON.parse(localStorage.getItem('epichat_history') || '[]');
-  } catch { return []; }
-}
 
 function formatDate(iso) {
   try {
@@ -66,12 +62,24 @@ const FIRST_AID = [
   'Call emergency services if seizure lasts >5 min',
 ];
 
-// ── component ─────────────────────────────────────────────────────────────────
 export default function Category1() {
   const navigate = useNavigate();
   const username = localStorage.getItem('epichat_username') || 'User';
-  const history = getHistory();
+  const token = localStorage.getItem('epichat_token');
+  const [history, setHistory] = React.useState([]);
   const [activeTab, setActiveTab] = useState('history');
+
+  React.useEffect(() => {
+    if (!token) return;
+    fetch(`${API_BASE}/api/history`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    })
+    .then(r => r.json())
+    .then(data => {
+      if (data.history) setHistory(data.history.reverse());
+    })
+    .catch(console.error);
+  }, [token]);
 
   const tabs = [
     { id: 'history', label: 'EEG History', icon: ClipboardList },
@@ -169,7 +177,7 @@ export default function Category1() {
                     <div>
                       <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>{entry.file_name || 'EEG Recording'}</div>
                       <div style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', marginTop: 3, display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <Clock size={12} /> {formatDate(entry.date)}
+                        <Clock size={12} /> {formatDate(entry.upload_time || entry.date)}
                       </div>
                     </div>
                   </div>

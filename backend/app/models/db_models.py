@@ -3,46 +3,40 @@ from __future__ import annotations
 from datetime import datetime
 
 from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from database import Base
 
-class Base(DeclarativeBase):
-    pass
-
-
-class Patient(Base):
-    __tablename__ = "patients"
+class User(Base):
+    __tablename__ = "users"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     username: Mapped[str] = mapped_column(String(255), unique=True, index=True)
-    name: Mapped[str] = mapped_column(String(255))
-    age: Mapped[int] = mapped_column(Integer)
-    gender: Mapped[str] = mapped_column(String(64))
+    email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
+    password: Mapped[str] = mapped_column(String(255))
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
-    submissions: Mapped[list["Submission"]] = relationship(
-        "Submission", back_populates="patient", cascade="all, delete-orphan"
+    eeg_records: Mapped[list["EEGHistory"]] = relationship(
+        "EEGHistory", back_populates="user", cascade="all, delete-orphan"
     )
 
 
-class Submission(Base):
-    __tablename__ = "submissions"
+class EEGHistory(Base):
+    __tablename__ = "eeg_records"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    patient_id: Mapped[int] = mapped_column(ForeignKey("patients.id"), index=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
-
-    eeg_file_path: Mapped[str | None] = mapped_column(String(1024), nullable=True)
-    symptoms_text: Mapped[str | None] = mapped_column(Text, nullable=True)
-
-    result_label: Mapped[str] = mapped_column(String(32))  # Normal / Pre-ictal / Ictal
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    
+    file_name: Mapped[str] = mapped_column(String(255))
+    upload_time: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    
+    classification_result: Mapped[str] = mapped_column(String(32))  # Normal / Pre-ictal / Ictal
+    risk_level: Mapped[float] = mapped_column(Float)  # Similar to max_prob or risk score avg
     confidence: Mapped[float] = mapped_column(Float)  # 0-100
+    
+    raw_file_path: Mapped[str] = mapped_column(String(1024))
+    
+    risk_score_series_json: Mapped[str] = mapped_column(Text, default="[]")
+    seizure_channels_json: Mapped[str] = mapped_column(Text, default="[]")
 
-    risk_score_series_json: Mapped[str] = mapped_column(Text)  # JSON list[float]
-    seizure_channels_json: Mapped[str] = mapped_column(Text)  # JSON list[int]
-
-    reviewed: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
-    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-
-    patient: Mapped["Patient"] = relationship("Patient", back_populates="submissions")
-
+    user: Mapped["User"] = relationship("User", back_populates="eeg_records")

@@ -7,81 +7,43 @@ from typing import Optional
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
-from db import get_db
-from models.db_models import Patient, Submission
-from schemas import PatientSubmitResponse, SubmissionOut
+from database import get_db
+from models.db_models import User, EEGHistory
+from routers.auth import get_current_user
 from services.analysis import analyze_edf_to_summary, save_upload_file
-
 
 router = APIRouter(prefix="/api/patient", tags=["patient"])
 
 
-def _submission_to_out(sub: Submission) -> SubmissionOut:
-    return SubmissionOut(
-        id=sub.id,
-        created_at=sub.created_at,
-        patient_id=sub.patient.id,
-        patient_name=sub.patient.name,
-        patient_age=sub.patient.age,
-        patient_gender=sub.patient.gender,
-        patient_username=sub.patient.username,
-        eeg_uploaded=bool(sub.eeg_file_path),
-        symptoms_text=sub.symptoms_text,
-        result_label=sub.result_label,
-        confidence=float(sub.confidence),
-        risk_score_series=json.loads(sub.risk_score_series_json or "[]"),
-        seizure_channels=json.loads(sub.seizure_channels_json or "[]"),
-        reviewed=bool(sub.reviewed),
-        reviewed_at=sub.reviewed_at,
-    )
-
-
-@router.post("/submit", response_model=PatientSubmitResponse)
+@router.post("/submit")
 async def submit_patient(
-    username: str = Form(...),
-    name: str = Form(...),
-    age: int = Form(...),
-    gender: str = Form(...),
     symptoms_text: Optional[str] = Form(None),
     file: Optional[UploadFile] = File(None),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """
-    Persist patient + submission, run inference if EDF provided.
-    Note: This is a lightweight 'authenticated' stub using username as identity.
+    Persist submission and run inference if EDF provided.
+    Assumes authenticated via token!
     """
-    username = (username or "").strip().lower()
-    if not username:
-        raise HTTPException(status_code=400, detail="username is required")
 
-    patient = db.query(Patient).filter(Patient.username == username).one_or_none()
-    if patient is None:
-        patient = Patient(username=username, name=name, age=age, gender=gender)
-        db.add(patient)
-        db.commit()
-        db.refresh(patient)
-    else:
-        # Keep profile up to date from latest submission
-        patient.name = name
-        patient.age = age
-        patient.gender = gender
-        db.commit()
-        db.refresh(patient)
-
-    eeg_file_path = None
+    filename = "unknown"
+    eeg_file_path = ""
     analysis = {
         "risk_score_series": [],
+        "max_prob": 0.0,
         "result_label": "Normal",
         "confidence": 0.0,
         "seizure_channels": [],
     }
 
     if file is not None:
-        ext = (file.filename or "").split(".")[-1].lower()
+        filename = file.filename or "unknown.edf"
+        ext = filename.split(".")[-1].lower()
         if ext != "edf":
             raise HTTPException(status_code=400, detail="Only .edf supported for EEG inference.")
 
-        saved = save_upload_file(file.file, file.filename)
+        saved = save_upload_file(file.file, filename)
         eeg_file_path = str(saved)
         try:
             analysis = analyze_edf_to_summary(Path(saved))
@@ -90,24 +52,29 @@ async def submit_patient(
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Inference failed: {e}")
 
-    sub = Submission(
-        patient_id=patient.id,
-        eeg_file_path=eeg_file_path,
-        symptoms_text=symptoms_text,
-        result_label=analysis["result_label"],
+    sub = EEGHistory(
+        user_id=current_user.id,
+        file_name=filename,
+        classification_result=analysis["result_label"],
+        risk_level=float(analysis["max_prob"]),
         confidence=float(analysis["confidence"]),
+        raw_file_path=eeg_file_path,
         risk_score_series_json=json.dumps(analysis["risk_score_series"]),
         seizure_channels_json=json.dumps(analysis["seizure_channels"]),
-        reviewed=False,
-        reviewed_at=None,
     )
+    
     db.add(sub)
     db.commit()
     db.refresh(sub)
-    db.refresh(patient)
 
-    return PatientSubmitResponse(
-        message="Submission stored.",
-        submission=_submission_to_out(sub),
-    )
-
+    return {
+        "message": "Submission stored successfully.",
+        "submission": {
+            "id": sub.id,
+            "upload_time": sub.upload_time,
+            "file_name": sub.file_name,
+            "result_label": sub.classification_result,
+            "risk_level": sub.risk_level,
+            "confidence": sub.confidence,
+        }
+    }

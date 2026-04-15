@@ -1,6 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Activity, ArrowLeft, UploadCloud, Loader, CheckCircle, AlertTriangle } from 'lucide-react';
+import {
+  Activity, ArrowLeft, UploadCloud, Loader, CheckCircle,
+  AlertTriangle, User, Mail, AtSign, ShieldCheck,
+} from 'lucide-react';
 
 import EEGMonitor from './EEGMonitor';
 import ResultsCard from './ResultsCard';
@@ -8,33 +11,18 @@ import RiskTimeline from './RiskTimeline';
 import BrainHeatmap from './BrainHeatmap';
 import { apiJson } from '../lib/api';
 
-// ── persist result to user history ─────────────────────────────────────────
-function saveToHistory(submission) {
-  try {
-    const raw = localStorage.getItem('epichat_history') || '[]';
-    const history = JSON.parse(raw);
-    history.unshift({
-      date: new Date().toISOString(),
-      result_label: submission.result_label,
-      confidence: submission.confidence,
-      file_name: submission.file_name || 'EEG File',
-      risk_score_series: submission.risk_score_series || [],
-      seizure_channels: submission.seizure_channels || [],
-    });
-    localStorage.setItem('epichat_history', JSON.stringify(history.slice(0, 20)));
-  } catch (_) {}
-}
+// ── server handles history now ──────────────────────────────────────────────
 
 // ── clean analyzing loader ──────────────────────────────────────────────────
 function AnalyzingLoader() {
   const phases = [
-    { phase: 'Uploading',   label: 'Reading EDF file…' },
-    { phase: 'Uploading',   label: 'Validating channel data…' },
-    { phase: 'Preprocessing', label: 'Resampling to 200 Hz…' },
-    { phase: 'Preprocessing', label: 'Applying bipolar montage…' },
-    { phase: 'Analyzing',   label: 'Slicing into 12-second windows…' },
-    { phase: 'Analyzing',   label: 'Running EEGNet feature extraction…' },
-    { phase: 'Analyzing',   label: 'Running BIOT Transformer…' },
+    { phase: 'Uploading',        label: 'Reading EDF file…' },
+    { phase: 'Uploading',        label: 'Validating channel data…' },
+    { phase: 'Preprocessing',    label: 'Resampling to 200 Hz…' },
+    { phase: 'Preprocessing',    label: 'Applying bipolar montage…' },
+    { phase: 'Analyzing',        label: 'Slicing into 12-second windows…' },
+    { phase: 'Analyzing',        label: 'Running EEGNet feature extraction…' },
+    { phase: 'Analyzing',        label: 'Running BIOT Transformer…' },
     { phase: 'Generating Results', label: 'Computing seizure probability…' },
   ];
   const steps = phases.map(p => p.label);
@@ -101,21 +89,94 @@ function AnalyzingLoader() {
   );
 }
 
+// ── read-only Patient Profile card ──────────────────────────────────────────
+function PatientProfileCard({ username, email, fullName }) {
+  const avatar = (username || 'P').charAt(0).toUpperCase();
+
+  const rows = [
+    { Icon: User,    label: 'Name',     value: fullName  || username },
+    { Icon: Mail,    label: 'Email',    value: email     || '—' },
+    { Icon: AtSign,  label: 'Username', value: username  || '—' },
+  ];
+
+  return (
+    <div style={{
+      background: 'rgba(99,102,241,0.06)',
+      border: '1px solid rgba(99,102,241,0.25)',
+      borderRadius: 16,
+      padding: '18px 20px',
+      display: 'flex',
+      alignItems: 'center',
+      gap: 20,
+    }}>
+      {/* Avatar */}
+      <div style={{
+        width: 56, height: 56, borderRadius: '50%',
+        background: 'linear-gradient(135deg,#4f46e5,#c084fc)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: 22, fontWeight: 800, color: 'white', flexShrink: 0,
+        boxShadow: '0 0 20px rgba(192,132,252,0.35)',
+      }}>
+        {avatar}
+      </div>
+
+      {/* Info rows */}
+      <div style={{ flex: 1 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 10 }}>
+          <ShieldCheck size={14} style={{ color: '#818cf8' }} />
+          <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#818cf8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+            Patient Profile
+          </span>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+          {rows.map(({ Icon, label, value }) => (
+            <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.87rem' }}>
+              <Icon size={13} style={{ color: 'var(--text-secondary)', flexShrink: 0 }} />
+              <span style={{ color: 'var(--text-secondary)', minWidth: 64 }}>{label}:</span>
+              <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{value}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Read-only badge */}
+      <div style={{
+        fontSize: '0.72rem', fontWeight: 700, color: '#34d399',
+        background: 'rgba(52,211,153,0.1)', border: '1px solid rgba(52,211,153,0.25)',
+        borderRadius: 20, padding: '4px 10px', whiteSpace: 'nowrap', alignSelf: 'flex-start',
+      }}>
+        🔒 Read-only
+      </div>
+    </div>
+  );
+}
+
 // ── main component ───────────────────────────────────────────────────────────
 export default function Category2() {
   const navigate = useNavigate();
   const inputRef = useRef(null);
 
-  const username = localStorage.getItem('epichat_username') || '';
+  // ── Session data (read-only, from login) ────────────────────────────────
+  const sessionUsername = localStorage.getItem('epichat_username') || '';
+  const sessionEmail    = localStorage.getItem('epichat_email')    || '';
+  // Full name stored under the users map (username → { email, ... })
+  const sessionFullName = (() => {
+    try {
+      const all = JSON.parse(localStorage.getItem('epichat_users') || '{}');
+      return all[sessionUsername]?.fullName || all[sessionUsername]?.name || '';
+    } catch (_) { return ''; }
+  })();
 
-  const [patient, setPatient] = useState({ username, name: '', age: 20, gender: 'Male' });
+  // ── Editable fields only ─────────────────────────────────────────────────
+  const [age,     setAge]     = useState(20);
+  const [gender,  setGender]  = useState('Male');
   const [symptoms, setSymptoms] = useState('');
   const [file, setFile] = useState(null);
 
-  const [status, setStatus] = useState('idle'); // idle | analyzing | result
+  const [status, setStatus]       = useState('idle'); // idle | analyzing | result
   const [submission, setSubmission] = useState(null);
-  const [playhead, setPlayhead] = useState(0);
-  const [fadeIn, setFadeIn] = useState(false);
+  const [playhead,   setPlayhead]  = useState(0);
+  const [fadeIn,     setFadeIn]    = useState(false);
 
   const riskSeries      = submission?.risk_score_series || [];
   const seizureChannels = submission?.seizure_channels  || [];
@@ -129,10 +190,10 @@ export default function Category2() {
     return () => cancelAnimationFrame(raf);
   }, [status]);
 
+  // canSubmit: session username required + (file OR symptoms)
   const canSubmit = useMemo(() =>
-    patient.username && patient.name && patient.gender &&
-    Number(patient.age) >= 0 && (file || symptoms.trim()),
-  [file, patient, symptoms]);
+    sessionUsername && gender && Number(age) >= 0 && (file || symptoms.trim()),
+  [age, gender, file, symptoms, sessionUsername]);
 
   const onPickFile = (f) => {
     if (!f) return;
@@ -150,20 +211,23 @@ export default function Category2() {
     setFadeIn(false);
 
     const fd = new FormData();
-    fd.append('username', patient.username);
-    fd.append('name',     patient.name);
-    fd.append('age',      String(patient.age));
-    fd.append('gender',   patient.gender);
+    fd.append('username', sessionUsername);
+    fd.append('name',     sessionFullName || sessionUsername);
+    fd.append('age',      String(age));
+    fd.append('gender',   gender);
     if (symptoms.trim()) fd.append('symptoms_text', symptoms.trim());
     if (file)            fd.append('file', file);
 
     try {
-      const res = await apiJson('/api/patient/submit', { method: 'POST', body: fd });
+      const token = localStorage.getItem('epichat_token');
+      const res = await apiJson('/api/patient/submit', { 
+        method: 'POST', 
+        body: fd,
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
       const sub = { ...res.submission, file_name: file?.name };
       setSubmission(sub);
-      saveToHistory(sub);
       setStatus('result');
-      // Slight delay then fade results in
       setTimeout(() => setFadeIn(true), 80);
     } catch (e) {
       console.error(e);
@@ -195,31 +259,52 @@ export default function Category2() {
           <div className="neon-text" style={{ fontWeight: 800, marginBottom: 14, fontSize: '1.1rem' }}>
             📋 Patient Input
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 10 }}>
-            <input className="premium-input" placeholder="Username / Email"
-              value={patient.username}
-              onChange={e => setPatient(p => ({ ...p, username: e.target.value }))} />
-            <input className="premium-input" placeholder="Full name"
-              value={patient.name}
-              onChange={e => setPatient(p => ({ ...p, name: e.target.value }))} />
-            <input className="premium-input" type="number" min="0" max="130" placeholder="Age"
-              value={patient.age}
-              onChange={e => setPatient(p => ({ ...p, age: Number(e.target.value) }))} />
-            <select className="premium-input" value={patient.gender}
-              onChange={e => setPatient(p => ({ ...p, gender: e.target.value }))}>
-              <option>Male</option><option>Female</option><option>Other</option>
+
+          {/* ── READ-ONLY PATIENT PROFILE ──────────────────────────────── */}
+          <PatientProfileCard
+            username={sessionUsername}
+            email={sessionEmail}
+            fullName={sessionFullName}
+          />
+
+          {/* ── EDITABLE FIELDS ────────────────────────────────────────── */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 10, marginTop: 14 }}>
+            <input
+              className="premium-input"
+              type="number"
+              min="0"
+              max="130"
+              placeholder="Age"
+              value={age}
+              onChange={e => setAge(Number(e.target.value))}
+            />
+            <select
+              className="premium-input"
+              value={gender}
+              onChange={e => setGender(e.target.value)}
+            >
+              <option>Male</option>
+              <option>Female</option>
+              <option>Other</option>
             </select>
           </div>
 
-          <textarea className="premium-input"
+          <textarea
+            className="premium-input"
             style={{ marginTop: 10, minHeight: 80, resize: 'vertical' }}
             placeholder="Symptoms (optional but recommended if no EEG file): e.g., aura, staring spells, confusion, jerks…"
             value={symptoms}
-            onChange={e => setSymptoms(e.target.value)} />
+            onChange={e => setSymptoms(e.target.value)}
+          />
 
           <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginTop: 10, flexWrap: 'wrap' }}>
-            <input ref={inputRef} type="file" accept=".edf" style={{ display: 'none' }}
-              onChange={e => onPickFile(e.target.files?.[0])} />
+            <input
+              ref={inputRef}
+              type="file"
+              accept=".edf"
+              style={{ display: 'none' }}
+              onChange={e => onPickFile(e.target.files?.[0])}
+            />
             <button className="btn-secondary" type="button" onClick={() => inputRef.current?.click()}>
               <UploadCloud size={16} style={{ marginRight: 8 }} />
               {file ? 'Replace EEG file' : 'Choose EEG (.edf)'}
@@ -228,8 +313,13 @@ export default function Category2() {
               {file ? `✓ ${file.name}` : 'No file selected'}
             </span>
             <div style={{ flex: 1 }} />
-            <button className="btn-primary" type="button" onClick={submit}
-              disabled={!canSubmit || status === 'analyzing'} id="cat2-submit-btn">
+            <button
+              className="btn-primary"
+              type="button"
+              onClick={submit}
+              disabled={!canSubmit || status === 'analyzing'}
+              id="cat2-submit-btn"
+            >
               {status === 'analyzing' ? 'Analyzing…' : 'Submit for Analysis'}
             </button>
           </div>

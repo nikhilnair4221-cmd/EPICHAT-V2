@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Bot, X, Loader } from 'lucide-react';
+import { Send, Bot, X, Loader, Mic, MicOff, Volume2 } from 'lucide-react';
 import { API_BASE } from '../lib/api';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -40,27 +40,97 @@ export default function Chatbot({ onClose }) {
   ]);
   const [inputVal,  setInputVal]  = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const [voiceError, setVoiceError] = useState('');
+  
   const endRef   = useRef(null);
   const inputRef = useRef(null);
+  const recognitionRef = useRef(null);
 
   // Auto-scroll on new messages
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isLoading]);
 
+  // ── Speech Recognition Setup ───────────────────────────────────────────────
+  useEffect(() => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SpeechRecognition) {
+      const recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.lang = 'en-US';
+
+      recognition.onresult = (event) => {
+        const transcript = event.results[0][0].transcript;
+        setInputVal(transcript);
+        setIsListening(false);
+      };
+
+      recognition.onerror = (event) => {
+        console.error('Speech recognition error:', event.error);
+        if (event.error === 'not-allowed') {
+          setVoiceError('Microphone access required');
+        } else {
+          setVoiceError('Speech detection failed');
+        }
+        setIsListening(false);
+        setTimeout(() => setVoiceError(''), 3000);
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+      };
+
+      recognitionRef.current = recognition;
+    }
+  }, []);
+
+  const toggleListening = () => {
+    if (isListening) {
+      recognitionRef.current?.stop();
+    } else {
+      setVoiceError('');
+      try {
+        recognitionRef.current?.start();
+        setIsListening(true);
+      } catch (err) {
+        console.error('Failed to start recognition:', err);
+        setVoiceError('Microphone access required');
+        setTimeout(() => setVoiceError(''), 3000);
+      }
+    }
+  };
+
+  // ── Text-to-Speech ─────────────────────────────────────────────────────────
+  const speakText = (text) => {
+    if ('speechSynthesis' in window) {
+      // Cancel any ongoing speech
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.rate = 1.0;
+      utterance.pitch = 1.0;
+      window.speechSynthesis.speak(utterance);
+    }
+  };
+
   // ── Send message to backend proxy ──────────────────────────────────────────
-  const sendToBackend = async (history) => {
-    // Build conversation in the format the backend expects
+  const sendToBackend = async (text, history) => {
+    // Build conversation in the format the backend expects: { message, history }
     const payload = {
-      messages: history.map(m => ({
+      message: text,
+      history: history.map(m => ({
         role:    m.role === 'assistant' ? 'assistant' : 'user',
-        content: m.text,
+        text:    m.text,
       })),
     };
 
     const res = await fetch(`${API_BASE}/api/chat`, {
       method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem('epichat_token') || ''}`
+      },
       body:    JSON.stringify(payload),
     });
 
@@ -75,34 +145,33 @@ export default function Chatbot({ onClose }) {
 
   // ── Handle submit ──────────────────────────────────────────────────────────
   const handleSend = async (e) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
     const text = inputVal.trim();
     if (!text || isLoading) return;
 
     // Add user message immediately
     const userMsg = { id: Date.now(), role: 'user', text };
-    const updatedHistory = [...messages, userMsg];
-    setMessages(updatedHistory);
+    const historyBeforeResponse = [...messages];
+    setMessages(prev => [...prev, userMsg]);
     setInputVal('');
     setIsLoading(true);
     inputRef.current?.focus();
 
     try {
-      const reply = await sendToBackend(updatedHistory);
-      setMessages(prev => [
-        ...prev,
-        { id: Date.now() + 1, role: 'assistant', text: reply },
-      ]);
+      const reply = await sendToBackend(text, historyBeforeResponse);
+      const aiMsg = { id: Date.now() + 1, role: 'assistant', text: reply };
+      setMessages(prev => [...prev, aiMsg]);
+      // Optional: Auto-speak response if you want, but better as a button
     } catch (err) {
-      // Surface the real error — no hardcoded fallback
       setMessages(prev => [
         ...prev,
         {
           id: Date.now() + 1,
           role: 'assistant',
-          text: `⚠️ Unable to reach the AI backend.\n\n${err.message}\n\nMake sure:\n1. The backend is running on port 8000\n2. OPENAI_API_KEY is set in backend/.env`,
+          text: '🤖 AI assistant temporarily unavailable. Please try again in a moment.',
         },
       ]);
+      console.warn('[EpiChat] Chat backend error:', err.message);
     } finally {
       setIsLoading(false);
     }
@@ -134,6 +203,7 @@ export default function Chatbot({ onClose }) {
           <div style={{ fontSize: '0.72rem', color: isLoading ? '#f59e0b' : 'var(--success)', display: 'flex', alignItems: 'center', gap: 4 }}>
             <span style={{ width: 6, height: 6, borderRadius: '50%', background: isLoading ? '#f59e0b' : 'var(--success)', display: 'inline-block', animation: isLoading ? 'pulse 1s ease infinite' : 'none' }} />
             {isLoading ? 'Thinking…' : 'Online'}
+            {isListening && <span style={{ color: '#ef4444', marginLeft: 8 }}>• Listening...</span>}
           </div>
         </div>
         {onClose && (
@@ -156,9 +226,23 @@ export default function Chatbot({ onClose }) {
           <div key={msg.id} className={`chat-message-row ${msg.role === 'assistant' ? 'ai' : 'user'}`}>
             <div
               className={`chat-bubble ${msg.role === 'assistant' ? 'ai-bubble' : 'user-bubble'}`}
-              style={{ whiteSpace: 'pre-wrap', lineHeight: 1.55 }}
+              style={{ whiteSpace: 'pre-wrap', lineHeight: 1.55, position: 'relative' }}
             >
               {msg.text}
+              {msg.role === 'assistant' && msg.id !== 1 && (
+                <button 
+                  onClick={() => speakText(msg.text)}
+                  title="Speak Response"
+                  style={{ 
+                    position: 'absolute', bottom: -20, right: 0, 
+                    background: 'none', border: 'none', color: 'var(--text-secondary)',
+                    cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4,
+                    fontSize: '0.7rem'
+                  }}
+                >
+                  <Volume2 size={12} /> Speak
+                </button>
+              )}
             </div>
           </div>
         ))}
@@ -169,8 +253,26 @@ export default function Chatbot({ onClose }) {
         <div ref={endRef} />
       </div>
 
+      {/* ── ERROR DISPLAY ─────────────────────────────────────────────────── */}
+      {voiceError && (
+        <div style={{ color: '#ef4444', fontSize: '0.75rem', textAlign: 'center', padding: '4px 0' }}>
+          {voiceError}
+        </div>
+      )}
+
       {/* ── INPUT ─────────────────────────────────────────────────────────── */}
       <form onSubmit={handleSend} className="chatbot-input-container">
+        <button
+          type="button"
+          onClick={toggleListening}
+          className={`chat-voice-btn ${isListening ? 'listening' : ''}`}
+          style={{ 
+            background: 'none', border: 'none', color: isListening ? '#ef4444' : 'var(--text-secondary)',
+            cursor: 'pointer', marginRight: 8, display: 'flex', alignItems: 'center'
+          }}
+        >
+          {isListening ? <MicOff size={18} /> : <Mic size={18} />}
+        </button>
         <input
           ref={inputRef}
           id="chatbot-input"
@@ -178,7 +280,7 @@ export default function Chatbot({ onClose }) {
           value={inputVal}
           onChange={e => setInputVal(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder={isLoading ? 'Waiting for response…' : 'Ask about EEG results, seizures, first aid…'}
+          placeholder={isLoading ? 'Waiting for response…' : (isListening ? 'Listening...' : 'Ask about EEG results, seizures…')}
           className="chat-input"
           disabled={isLoading}
           autoComplete="off"
@@ -207,7 +309,11 @@ export default function Chatbot({ onClose }) {
           0%, 100% { opacity: 1; }
           50%       { opacity: 0.3; }
         }
+        .chat-voice-btn.listening {
+          animation: pulse 1s ease infinite;
+        }
       `}</style>
     </div>
   );
 }
+
