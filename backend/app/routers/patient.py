@@ -17,6 +17,9 @@ router = APIRouter(prefix="/api/patient", tags=["patient"])
 
 @router.post("/submit")
 async def submit_patient(
+    name: str = Form("Unknown"),
+    age: int = Form(0),
+    gender: str = Form("Other"),
     symptoms_text: Optional[str] = Form(None),
     file: Optional[UploadFile] = File(None),
     db: Session = Depends(get_db),
@@ -55,6 +58,10 @@ async def submit_patient(
     sub = EEGHistory(
         user_id=current_user.id,
         file_name=filename,
+        patient_name=name,
+        patient_age=age,
+        patient_gender=gender,
+        symptoms_text=symptoms_text,
         classification_result=analysis["result_label"],
         risk_level=float(analysis["max_prob"]),
         confidence=float(analysis["confidence"]),
@@ -73,8 +80,14 @@ async def submit_patient(
             "id": sub.id,
             "upload_time": sub.upload_time,
             "file_name": sub.file_name,
+            "patient_name": sub.patient_name,
+            "patient_age": sub.patient_age,
+            "patient_gender": sub.patient_gender,
             "result_label": sub.classification_result,
             "risk_level": sub.risk_level,
             "confidence": sub.confidence,
+            "risk_score_series": analysis["risk_score_series"],
+            "seizure_channels": analysis["seizure_channels"],
         }
     }
+

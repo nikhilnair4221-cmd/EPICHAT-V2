@@ -10,6 +10,7 @@ from pydantic import BaseModel
 from jose import JWTError, jwt
 import bcrypt
 
+from sqlalchemy.orm import Session
 from database import get_db
 from models.db_models import User
 

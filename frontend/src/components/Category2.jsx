@@ -325,39 +325,52 @@ export default function Category2() {
           </div>
         </div>
 
-        {/* ── ANALYZING STATE ──────────────────────────────────────────── */}
-        {status === 'analyzing' && <AnalyzingLoader />}
-
-        {/* ── RESULT STATE ─────────────────────────────────────────────── */}
-        {status === 'result' && submission && (
-          <div style={{ opacity: fadeIn ? 1 : 0, transition: 'opacity 0.5s ease', display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <ResultsCard resultLabel={submission.result_label} confidence={submission.confidence} />
+        {/* ── ANALYZING / RESULT STATE ────────────────────────────────── */}
+        {(status === 'analyzing' || status === 'result') && (
+          <div style={{ opacity: (status === 'result' && !fadeIn) ? 0 : 1, transition: 'opacity 0.5s ease', display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {status === 'analyzing' && <AnalyzingLoader />}
+            
+            <ResultsCard 
+              resultLabel={status === 'analyzing' ? 'Analyzing...' : submission?.result_label} 
+              confidence={status === 'analyzing' ? 0 : submission?.confidence} 
+            />
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-              <EEGMonitor isLive={false} riskSeries={riskSeries} seizureChannels={seizureChannels} height={320} />
-              <BrainHeatmap seizureChannels={seizureChannels} />
+              <EEGMonitor 
+                isLive={status === 'analyzing'} 
+                riskSeries={status === 'analyzing' ? [] : riskSeries} 
+                seizureChannels={status === 'analyzing' ? [] : seizureChannels} 
+                height={320} 
+              />
+              <BrainHeatmap seizureChannels={status === 'analyzing' ? [] : seizureChannels} />
             </div>
             <RiskTimeline
-              riskSeries={riskSeries}
-              playhead={Math.min(riskSeries.length - 1, playhead % Math.max(1, riskSeries.length))} />
-            <div style={{ textAlign: 'center', padding: '1rem 0 0.5rem' }}>
-              <p style={{ color: 'var(--success)', marginBottom: 12, fontSize: '0.9rem' }}>
-                ✓ Results saved to your history (Category 1)
-              </p>
-              <button className="btn-secondary" onClick={() => { setStatus('idle'); setSubmission(null); }}>
-                Run Another Analysis
-              </button>
-            </div>
+              riskSeries={status === 'analyzing' ? [] : riskSeries}
+              playhead={status === 'analyzing' ? 0 : Math.min(riskSeries.length - 1, playhead % Math.max(1, riskSeries.length))} 
+            />
+            
+            {status === 'result' && submission && (
+              <>
+                <div style={{ textAlign: 'center', padding: '1rem 0 0.5rem' }}>
+                  <p style={{ color: 'var(--success)', marginBottom: 12, fontSize: '0.9rem' }}>
+                    ✓ Results saved to your history (Category 1)
+                  </p>
+                  <button className="btn-secondary" onClick={() => { setStatus('idle'); setSubmission(null); }}>
+                    Run Another Analysis
+                  </button>
+                </div>
 
-            {/* ── DISCLAIMER FOOTER ──────────────────────────────────────── */}
-            <div style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-              padding: '12px 16px', borderRadius: 10,
-              background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.15)',
-              color: 'var(--text-secondary)', fontSize: '0.78rem', textAlign: 'center',
-            }}>
-              <AlertTriangle size={14} style={{ color: '#f59e0b', flexShrink: 0 }} />
-              <span>AI-assisted tool for informational purposes only. This is <strong style={{ color: 'var(--text-primary)' }}>not a medical diagnosis</strong>. Always consult a qualified neurologist for clinical interpretation and treatment decisions.</span>
-            </div>
+                {/* ── DISCLAIMER FOOTER ──────────────────────────────────────── */}
+                <div style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  padding: '12px 16px', borderRadius: 10,
+                  background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.15)',
+                  color: 'var(--text-secondary)', fontSize: '0.78rem', textAlign: 'center',
+                }}>
+                  <AlertTriangle size={14} style={{ color: '#f59e0b', flexShrink: 0 }} />
+                  <span>AI-assisted tool for informational purposes only. This is <strong style={{ color: 'var(--text-primary)' }}>not a medical diagnosis</strong>. Always consult a qualified neurologist for clinical interpretation and treatment decisions.</span>
+                </div>
+              </>
+            )}
           </div>
         )}
       </main>
