@@ -185,7 +185,7 @@ export default function Category1() {
                     <RiskBadge label={entry.result_label} />
                     {entry.confidence != null && (
                       <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>
-                        {(entry.confidence * 100).toFixed(1)}% confidence
+                        {Number(entry.confidence).toFixed(1)}% confidence
                       </span>
                     )}
                   </div>

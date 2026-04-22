@@ -8,7 +8,7 @@ import {
 import EEGMonitor from './EEGMonitor';
 import ResultsCard from './ResultsCard';
 import RiskTimeline from './RiskTimeline';
-import BrainHeatmap from './BrainHeatmap';
+import Brain3D from './Brain3D';
 import { apiJson } from '../lib/api';
 
 // ── server handles history now ──────────────────────────────────────────────
@@ -168,9 +168,8 @@ export default function Category2() {
   })();
 
   // ── Editable fields only ─────────────────────────────────────────────────
-  const [age,     setAge]     = useState(20);
-  const [gender,  setGender]  = useState('Male');
-  const [symptoms, setSymptoms] = useState('');
+  const [age,    setAge]    = useState(20);
+  const [gender, setGender] = useState('Male');
   const [file, setFile] = useState(null);
 
   const [status, setStatus]       = useState('idle'); // idle | analyzing | result
@@ -190,10 +189,10 @@ export default function Category2() {
     return () => cancelAnimationFrame(raf);
   }, [status]);
 
-  // canSubmit: session username required + (file OR symptoms)
+  // canSubmit: session username required + EDF file
   const canSubmit = useMemo(() =>
-    sessionUsername && gender && Number(age) >= 0 && (file || symptoms.trim()),
-  [age, gender, file, symptoms, sessionUsername]);
+    sessionUsername && gender && Number(age) >= 0 && file,
+  [age, gender, file, sessionUsername]);
 
   const onPickFile = (f) => {
     if (!f) return;
@@ -215,8 +214,7 @@ export default function Category2() {
     fd.append('name',     sessionFullName || sessionUsername);
     fd.append('age',      String(age));
     fd.append('gender',   gender);
-    if (symptoms.trim()) fd.append('symptoms_text', symptoms.trim());
-    if (file)            fd.append('file', file);
+    fd.append('file', file);
 
     try {
       const token = localStorage.getItem('epichat_token');
@@ -289,15 +287,7 @@ export default function Category2() {
             </select>
           </div>
 
-          <textarea
-            className="premium-input"
-            style={{ marginTop: 10, minHeight: 80, resize: 'vertical' }}
-            placeholder="Symptoms (optional but recommended if no EEG file): e.g., aura, staring spells, confusion, jerks…"
-            value={symptoms}
-            onChange={e => setSymptoms(e.target.value)}
-          />
-
-          <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginTop: 10, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginTop: 14, flexWrap: 'wrap' }}>
             <input
               ref={inputRef}
               type="file"
@@ -325,52 +315,83 @@ export default function Category2() {
           </div>
         </div>
 
-        {/* ── ANALYZING / RESULT STATE ────────────────────────────────── */}
-        {(status === 'analyzing' || status === 'result') && (
-          <div style={{ opacity: (status === 'result' && !fadeIn) ? 0 : 1, transition: 'opacity 0.5s ease', display: 'flex', flexDirection: 'column', gap: 16 }}>
-            {status === 'analyzing' && <AnalyzingLoader />}
-            
-            <ResultsCard 
-              resultLabel={status === 'analyzing' ? 'Analyzing...' : submission?.result_label} 
-              confidence={status === 'analyzing' ? 0 : submission?.confidence} 
-            />
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-              <EEGMonitor 
-                isLive={status === 'analyzing'} 
-                riskSeries={status === 'analyzing' ? [] : riskSeries} 
-                seizureChannels={status === 'analyzing' ? [] : seizureChannels} 
-                height={320} 
-              />
-              <BrainHeatmap seizureChannels={status === 'analyzing' ? [] : seizureChannels} />
-            </div>
-            <RiskTimeline
-              riskSeries={status === 'analyzing' ? [] : riskSeries}
-              playhead={status === 'analyzing' ? 0 : Math.min(riskSeries.length - 1, playhead % Math.max(1, riskSeries.length))} 
-            />
-            
-            {status === 'result' && submission && (
-              <>
-                <div style={{ textAlign: 'center', padding: '1rem 0 0.5rem' }}>
-                  <p style={{ color: 'var(--success)', marginBottom: 12, fontSize: '0.9rem' }}>
-                    ✓ Results saved to your history (Category 1)
-                  </p>
-                  <button className="btn-secondary" onClick={() => { setStatus('idle'); setSubmission(null); }}>
-                    Run Another Analysis
-                  </button>
-                </div>
+        {/* ── ANALYZING ──────────────────────────────────────────────── */}
+        {status === 'analyzing' && <AnalyzingLoader />}
 
-                {/* ── DISCLAIMER FOOTER ──────────────────────────────────────── */}
-                <div style={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                  padding: '12px 16px', borderRadius: 10,
-                  background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.15)',
-                  color: 'var(--text-secondary)', fontSize: '0.78rem', textAlign: 'center',
-                }}>
-                  <AlertTriangle size={14} style={{ color: '#f59e0b', flexShrink: 0 }} />
-                  <span>AI-assisted tool for informational purposes only. This is <strong style={{ color: 'var(--text-primary)' }}>not a medical diagnosis</strong>. Always consult a qualified neurologist for clinical interpretation and treatment decisions.</span>
+        {/* ── RESULTS — only rendered once API returns data ─────────── */}
+        {status === 'result' && submission && (
+          <div
+            style={{
+              opacity: fadeIn ? 1 : 0,
+              transition: 'opacity 0.55s ease',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 16,
+            }}
+          >
+            {/* Classification card */}
+            <ResultsCard
+              resultLabel={submission.result_label || 'Unknown'}
+              confidence={submission.confidence ?? 0}
+            />
+
+            {/* EEG monitor + 3D brain — responsive two-col */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+              gap: 16,
+            }}>
+              {riskSeries.length > 0 ? (
+                <EEGMonitor
+                  isLive={false}
+                  riskSeries={riskSeries}
+                  seizureChannels={seizureChannels}
+                  height={300}
+                />
+              ) : (
+                <div className="glass-panel" style={{ padding: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 200, color: 'var(--text-secondary)', fontSize: '0.88rem', flexDirection: 'column', gap: 10 }}>
+                  <Activity size={28} style={{ opacity: 0.4 }} />
+                  No EEG signal data available
                 </div>
-              </>
+              )}
+              <Brain3D seizureChannels={seizureChannels} />
+            </div>
+
+            {/* Risk timeline */}
+            {riskSeries.length > 0 ? (
+              <RiskTimeline
+                riskSeries={riskSeries}
+                playhead={Math.min(riskSeries.length - 1, playhead % Math.max(1, riskSeries.length))}
+              />
+            ) : (
+              <div className="glass-panel" style={{ padding: 16, color: 'var(--text-secondary)', fontSize: '0.85rem', textAlign: 'center' }}>
+                📈 Risk timeline not available for this recording
+              </div>
             )}
+
+            {/* Actions */}
+            <div style={{ textAlign: 'center', padding: '0.5rem 0' }}>
+              <p style={{ color: 'var(--success)', marginBottom: 12, fontSize: '0.9rem' }}>
+                ✓ Results saved to your history (User History)
+              </p>
+              <button className="btn-secondary" onClick={() => { setStatus('idle'); setSubmission(null); }}>
+                Run Another Analysis
+              </button>
+            </div>
+
+            {/* Disclaimer */}
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              padding: '12px 16px', borderRadius: 10,
+              background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.15)',
+              color: 'var(--text-secondary)', fontSize: '0.78rem', textAlign: 'center',
+            }}>
+              <AlertTriangle size={14} style={{ color: '#f59e0b', flexShrink: 0 }} />
+              <span>AI-assisted tool for informational purposes only. This is{' '}
+                <strong style={{ color: 'var(--text-primary)' }}>not a medical diagnosis</strong>.
+                Always consult a qualified neurologist.
+              </span>
+            </div>
           </div>
         )}
       </main>

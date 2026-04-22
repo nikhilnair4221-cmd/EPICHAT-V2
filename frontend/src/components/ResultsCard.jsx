@@ -1,6 +1,16 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, CheckCircle, Activity, Info, X } from 'lucide-react';
 
+function useTheme() {
+  const [t, setT] = React.useState(() => document.documentElement.getAttribute('data-theme') || 'dark');
+  React.useEffect(() => {
+    const obs = new MutationObserver(() => setT(document.documentElement.getAttribute('data-theme') || 'dark'));
+    obs.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    return () => obs.disconnect();
+  }, []);
+  return t;
+}
+
 function clamp(n, a, b) {
   return Math.max(a, Math.min(b, n));
 }
@@ -14,10 +24,14 @@ const CLASSIFICATION_INFO = [
 ];
 
 function ClassificationInfoPanel({ onClose }) {
+  const theme = useTheme();
+  const light = theme === 'light';
   return (
     <div style={{
-      background: 'rgba(3,7,18,0.95)', border: '1px solid rgba(0,255,255,0.15)',
+      background: light ? 'rgba(255,255,255,0.98)' : 'rgba(3,7,18,0.95)',
+      border: light ? '1px solid rgba(99,102,241,0.20)' : '1px solid rgba(0,255,255,0.15)',
       borderRadius: 14, padding: '16px 18px', marginTop: 12, position: 'relative',
+      boxShadow: light ? '0 4px 20px rgba(99,102,241,0.12)' : 'none',
     }}>
       <button
         onClick={onClose}
@@ -48,6 +62,8 @@ function ClassificationInfoPanel({ onClose }) {
 
 // ── What This Means explainer ──────────────────────────────────────────────
 function WhatThisMeans({ resultLabel, confidence }) {
+  const theme = useTheme();
+  const light = theme === 'light';
   const conf = Number.isFinite(confidence) ? confidence : 0;
   const explanations = {
     'Normal': `Your EEG recording shows normal brain wave patterns. The AI model is ${conf.toFixed(0)}% confident in this classification. No epileptiform discharges were detected in the analyzed channels.`,
@@ -59,12 +75,14 @@ function WhatThisMeans({ resultLabel, confidence }) {
 
   return (
     <div style={{
-      background: 'rgba(255,255,255,0.03)', borderRadius: 10,
-      padding: '10px 14px', marginTop: 12, fontSize: '0.82rem',
-      color: 'var(--text-secondary)', lineHeight: 1.6,
+      background: light ? 'rgba(99,102,241,0.06)' : 'rgba(255,255,255,0.03)',
+      borderRadius: 10, padding: '10px 14px', marginTop: 12, fontSize: '0.82rem',
+      color: light ? '#374151' : 'var(--text-secondary)', lineHeight: 1.6,
       borderLeft: '3px solid var(--accent)',
+      border: light ? '1px solid rgba(99,102,241,0.15)' : undefined,
+      borderLeftWidth: 3,
     }}>
-      <span style={{ fontWeight: 700, color: 'var(--text-primary)', marginRight: 6 }}>💡 What this means:</span>
+      <span style={{ fontWeight: 700, color: light ? '#111827' : 'var(--text-primary)', marginRight: 6 }}>💡 What this means:</span>
       {text}
     </div>
   );
@@ -72,6 +90,8 @@ function WhatThisMeans({ resultLabel, confidence }) {
 
 // ── Main component ──────────────────────────────────────────────────────────
 export default function ResultsCard({ resultLabel, confidence }) {
+  const theme = useTheme();
+  const light = theme === 'light';
   const [animated, setAnimated] = useState(0);
   const [showInfo, setShowInfo] = useState(false);
   const conf = Number.isFinite(confidence) ? confidence : 0;
@@ -140,7 +160,7 @@ export default function ResultsCard({ resultLabel, confidence }) {
         </div>
 
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 34, fontWeight: 900, color: '#eaffff', lineHeight: 1.1 }}>
+          <div style={{ fontSize: 34, fontWeight: 900, color: light ? '#0f172a' : '#eaffff', lineHeight: 1.1 }}>
             {animated.toFixed(1)}% <span style={{ color: meta.color }}>— {resultLabel}</span>
           </div>
 
@@ -148,15 +168,15 @@ export default function ResultsCard({ resultLabel, confidence }) {
           <div style={{ display: 'flex', gap: 16, marginTop: 8, flexWrap: 'wrap' }}>
             <div style={{ fontSize: '0.82rem' }}>
               <span style={{ color: 'var(--text-secondary)' }}>Risk Level: </span>
-              <span style={{ color: meta.color, fontWeight: 700 }}>{meta.riskLevel}</span>
+              <span style={{ color: meta.color, fontWeight: 800 }}>{meta.riskLevel}</span>
             </div>
             <div style={{ fontSize: '0.82rem' }}>
               <span style={{ color: 'var(--text-secondary)' }}>Confidence: </span>
-              <span style={{ color: 'var(--text-primary)', fontWeight: 700 }}>{conf.toFixed(1)}%</span>
+              <span style={{ color: light ? '#0f172a' : 'var(--text-primary)', fontWeight: 800 }}>{conf.toFixed(1)}%</span>
             </div>
             <div style={{ fontSize: '0.82rem' }}>
               <span style={{ color: 'var(--text-secondary)' }}>Severity: </span>
-              <span style={{ color: meta.color, fontWeight: 700 }}>{meta.badge}</span>
+              <span style={{ color: meta.color, fontWeight: 800 }}>{meta.badge}</span>
             </div>
           </div>
         </div>

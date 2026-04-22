@@ -3,6 +3,7 @@
 
 # Raw EEG data (too large for Git — use Git LFS or external storage)
 data/raw/
+backend/data/uploads/*.edf
 data/processed/*.npy
 data/processed/**/*.npy
 

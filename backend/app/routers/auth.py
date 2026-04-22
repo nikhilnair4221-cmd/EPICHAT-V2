@@ -13,6 +13,7 @@ import bcrypt
 from sqlalchemy.orm import Session
 from database import get_db
 from models.db_models import User
+from email_service import send_welcome_email
 
 # Using direct bcrypt to avoid passlib/Python 3.13 compatibility issues
 
@@ -83,7 +84,7 @@ def login(req: LoginRequest, db: Session = Depends(get_db)):
         if not verify_password(pwd, user.password):
             raise HTTPException(status_code=401, detail="Incorrect password")
     else:
-        # Create user if not exists
+        # Create user if not exists (first-time registration)
         user = User(
             username=username,
             email=email,
@@ -92,6 +93,11 @@ def login(req: LoginRequest, db: Session = Depends(get_db)):
         db.add(user)
         db.commit()
         db.refresh(user)
+        # Send welcome email — silently skips if SMTP not configured
+        try:
+            send_welcome_email(email, username)
+        except Exception:
+            pass
 
     # Issue token
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)

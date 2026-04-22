@@ -3,6 +3,8 @@
 """
 from __future__ import annotations
 
+from prompts import EPICHAT_SYSTEM_PROMPT
+
 import os
 import httpx
 from fastapi import APIRouter, HTTPException
@@ -15,10 +17,7 @@ OPENAI_API_URL = "https://api.openai.com/v1/chat/completions"
 OPENAI_MODEL   = "gpt-4o-mini"
 GEMINI_MODEL   = "gemini-flash-latest"
 
-SYSTEM_PROMPT = (
-    "You are EpiChat AI. Explain EEG results and epilepsy precautions. "
-    "You are not a doctor. Always include disclaimer."
-)
+SYSTEM_PROMPT = EPICHAT_SYSTEM_PROMPT
 
 class ChatRequest(BaseModel):
     message: str
@@ -49,7 +48,7 @@ async def chat(req: ChatRequest):
             "contents": contents,
             "generationConfig": {
                 "temperature": 0.7,
-                "maxOutputTokens": 500
+                "maxOutputTokens": 2048
             }
         }
         
@@ -91,7 +90,7 @@ async def chat(req: ChatRequest):
     payload = {
         "model": OPENAI_MODEL,
         "messages": messages,
-        "max_tokens": 500,
+        "max_tokens": 2048,
         "temperature": 0.7,
     }
 
