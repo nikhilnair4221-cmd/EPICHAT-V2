@@ -278,11 +278,11 @@ h1.title, h2.title, h3.title {
 
 /* Base Layouts */
 .app-canvas {
-  width: 100%;          /* FIXED: was 100vw which caused overflow in AppLayout */
+  width: 100%;
   min-height: 100vh;
   position: relative;
   overflow-x: hidden;
-  overflow-y: auto;
+  /* Removed overflow-y: auto to delegate scrolling to parent containers and avoid nested scrollbars */
   box-sizing: border-box;
 }
 

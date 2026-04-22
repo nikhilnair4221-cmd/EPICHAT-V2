@@ -11,6 +11,7 @@ const PAGE_TITLES = {
   '/category1': 'User History',
   '/category2': 'EEG Detection',
   '/category3': 'Nearby Doctors',
+  '/settings':  'Settings',
 };
 
 // ─── Top Header ───────────────────────────────────────────────────────────────
@@ -92,7 +93,7 @@ export default function AppLayout({ children }) {
   return (
     <div style={{
       display: 'flex',
-      minHeight: '100vh',
+      height: '100vh',
       width: '100%',
       maxWidth: '100vw',
       overflow: 'hidden',

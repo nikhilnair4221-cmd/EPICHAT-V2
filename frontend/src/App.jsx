@@ -7,6 +7,7 @@ import Category2 from './components/Category2';
 import Category3 from './components/Category3';
 import HomePage from './components/HomePage';
 import AppLayout from './components/AppLayout';
+import SettingsPanel from './components/SettingsPanel';
 
 function App() {
   // Apply stored theme on every cold mount
@@ -27,6 +28,7 @@ function App() {
         <Route path="/category1" element={<AppLayout><Category1 /></AppLayout>} />
         <Route path="/category2" element={<AppLayout><Category2 /></AppLayout>} />
         <Route path="/category3" element={<AppLayout><Category3 /></AppLayout>} />
+        <Route path="/settings"  element={<AppLayout><SettingsPanel /></AppLayout>} />
 
         {/* Redirects */}
         <Route path="/patient" element={<Navigate to="/dashboard" replace />} />

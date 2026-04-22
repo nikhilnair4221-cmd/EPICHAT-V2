@@ -20,7 +20,6 @@ const NAV_SECTIONS = [
     label: 'Tools',
     items: [
       { id: 'chat',    label: 'AI Assistant',    icon: MessageSquare, route: null, action: 'chat' },
-      { id: 'insights',label: 'Health Insights', icon: Lightbulb,     route: null, action: 'insights' },
     ],
   },
 ];
@@ -77,10 +76,6 @@ export default function Sidebar() {
     setMobileOpen(false);
     if (item.action === 'chat') {
       document.getElementById('fab-chatbot-toggle')?.click();
-      return;
-    }
-    if (item.action === 'insights') {
-      window.alert('Health Insights — coming soon!');
       return;
     }
     if (item.route) navigate(item.route);
@@ -180,11 +175,11 @@ export default function Sidebar() {
 
       {/* ── Bottom: Settings + Logout ─────────────────────────────── */}
       <div style={{ padding: '8px 8px 12px', borderTop: '1px solid var(--glass-border)' }}>
-        {/* Settings (placeholder) */}
+        {/* Settings */}
         <button
           id="sidebar-settings"
           title={collapsed ? 'Settings' : ''}
-          onClick={() => window.alert('Settings — coming soon!')}
+          onClick={() => navigate('/settings')}
           style={{
             display: 'flex', alignItems: 'center', gap: 12,
             padding: collapsed ? '10px 0' : '10px 16px',
