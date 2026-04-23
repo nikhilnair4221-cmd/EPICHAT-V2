@@ -95,6 +95,9 @@ export default function ResultsCard({ resultLabel, confidence }) {
   const [animated, setAnimated] = useState(0);
   const [showInfo, setShowInfo] = useState(false);
   const conf = Number.isFinite(confidence) ? confidence : 0;
+  
+  const role = localStorage.getItem('epichat_role') || 'user';
+  const isDoctor = role === 'doctor';
 
   useEffect(() => {
     let raf = 0;
@@ -128,22 +131,24 @@ export default function ResultsCard({ resultLabel, confidence }) {
       {/* Section header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center' }}>
         <div className="neon-text" style={{ fontWeight: 700, fontSize: '1rem' }}>🧠 Seizure Classification</div>
-        <button
-          onClick={() => setShowInfo(v => !v)}
-          style={{
-            background: 'none', border: '1px solid rgba(0,255,255,0.15)', borderRadius: 8,
-            padding: '4px 10px', cursor: 'pointer', color: 'var(--text-secondary)',
-            display: 'flex', alignItems: 'center', gap: 5, fontSize: '0.75rem',
-            fontFamily: 'inherit', transition: 'border-color 0.2s',
-          }}
-          aria-label="Show classification info"
-        >
-          <Info size={13} /> What do these stages mean?
-        </button>
+        {!isDoctor && (
+          <button
+            onClick={() => setShowInfo(v => !v)}
+            style={{
+              background: 'none', border: '1px solid rgba(0,255,255,0.15)', borderRadius: 8,
+              padding: '4px 10px', cursor: 'pointer', color: 'var(--text-secondary)',
+              display: 'flex', alignItems: 'center', gap: 5, fontSize: '0.75rem',
+              fontFamily: 'inherit', transition: 'border-color 0.2s',
+            }}
+            aria-label="Show classification info"
+          >
+            <Info size={13} /> What do these stages mean?
+          </button>
+        )}
       </div>
 
       {/* Info panel (toggleable) */}
-      {showInfo && <ClassificationInfoPanel onClose={() => setShowInfo(false)} />}
+      {!isDoctor && showInfo && <ClassificationInfoPanel onClose={() => setShowInfo(false)} />}
 
       {/* Result display */}
       <div style={{ display: 'flex', gap: 14, alignItems: 'center', marginTop: 14 }}>
@@ -183,7 +188,7 @@ export default function ResultsCard({ resultLabel, confidence }) {
       </div>
 
       {/* What this means */}
-      <WhatThisMeans resultLabel={resultLabel} confidence={confidence} />
+      {!isDoctor && <WhatThisMeans resultLabel={resultLabel} confidence={confidence} />}
     </div>
   );
 }
