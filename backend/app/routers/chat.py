@@ -22,6 +22,7 @@ SYSTEM_PROMPT = EPICHAT_SYSTEM_PROMPT
 class ChatRequest(BaseModel):
     message: str
     history: List[Dict[str, Any]] = []
+    role: str = "user"
 
 class ChatResponse(BaseModel):
     reply: str
@@ -43,8 +44,13 @@ async def chat(req: ChatRequest):
             
         contents.append({"role": "user", "parts": [{"text": req.message}]})
         
+        # Determine system prompt based on role
+        current_system_prompt = SYSTEM_PROMPT
+        if req.role == "doctor":
+            current_system_prompt += "\n\n[ROLE: DOCTOR] You are assisting a doctor. Provide advanced summaries of EEG reports, patterns, trends, and non-diagnostic clinical insights. Assume medical knowledge."
+
         payload = {
-            "systemInstruction": {"parts": [{"text": SYSTEM_PROMPT}]},
+            "systemInstruction": {"parts": [{"text": current_system_prompt}]},
             "contents": contents,
             "generationConfig": {
                 "temperature": 0.7,
@@ -75,7 +81,11 @@ async def chat(req: ChatRequest):
         return ChatResponse(reply="🤖 [Mock Mode] Please add an OPENAI_API_KEY to the .env file for OpenAI fallback.")
 
     # Build messages with system prompt prepended for OpenAI
-    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+        current_system_prompt = SYSTEM_PROMPT
+        if req.role == "doctor":
+            current_system_prompt += "\n\n[ROLE: DOCTOR] You are assisting a doctor. Provide advanced summaries of EEG reports, patterns, trends, and non-diagnostic clinical insights. Assume medical knowledge."
+
+    messages = [{"role": "system", "content": current_system_prompt}]
     
     # Append history
     for m in req.history:

@@ -10,6 +10,12 @@ from routers.auth import get_current_user
 
 router = APIRouter(prefix="/api/history", tags=["history"])
 
+@router.delete("/clear")
+def clear_user_history(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    db.query(EEGHistory).filter(EEGHistory.user_id == current_user.id).delete()
+    db.commit()
+    return {"message": "History cleared"}
+
 @router.get("")
 def get_user_history(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     records = db.query(EEGHistory).filter(EEGHistory.user_id == current_user.id).all()

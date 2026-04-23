@@ -29,11 +29,13 @@ class LoginRequest(BaseModel):
     username: str
     email: str
     password: str
+    role: Optional[str] = "user"
 
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     username: str
+    role: str
 
 def get_password_hash(password: str) -> str:
     pwd_bytes = password.encode('utf-8')
@@ -88,7 +90,8 @@ def login(req: LoginRequest, db: Session = Depends(get_db)):
         user = User(
             username=username,
             email=email,
-            password=get_password_hash(pwd)
+            password=get_password_hash(pwd),
+            role=req.role
         )
         db.add(user)
         db.commit()
@@ -102,7 +105,7 @@ def login(req: LoginRequest, db: Session = Depends(get_db)):
     # Issue token
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
-        data={"sub": user.username, "id": user.id}, expires_delta=access_token_expires
+        data={"sub": user.username, "id": user.id, "role": user.role}, expires_delta=access_token_expires
     )
 
-    return TokenResponse(access_token=access_token, username=user.username)
+    return TokenResponse(access_token=access_token, username=user.username, role=user.role)

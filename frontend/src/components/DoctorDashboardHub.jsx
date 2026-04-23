@@ -1,103 +1,83 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ClipboardList, BrainCircuit, MapPin, TrendingUp, AlertCircle, Activity } from 'lucide-react';
+import { ClipboardList, BrainCircuit, Users, AlertCircle, Activity } from 'lucide-react';
+import { API_BASE } from '../lib/api';
 
 const NAV_CARDS = [
   {
-    id: 'cat1', route: '/category1', icon: ClipboardList,
-    label: 'User History', sub: 'Medical info, past EEGs & reports',
-    color: '#818cf8', glow: 'rgba(129,140,248,0.30)',
-    gradient: 'linear-gradient(135deg,#4f46e5,#818cf8)',
+    id: 'doc-eeg', route: '/doctor-eeg', icon: BrainCircuit,
+    label: 'EEG Detection', sub: 'Upload & analyze patient EEG data',
+    color: '#0ea5e9', glow: 'rgba(14,165,233,0.30)',
+    gradient: 'linear-gradient(135deg,#3b82f6,#0ea5e9)',
   },
   {
-    id: 'cat2', route: '/category2', icon: BrainCircuit,
-    label: 'EEG Detection', sub: 'Upload & analyze brain activity',
-    color: '#c084fc', glow: 'rgba(192,132,252,0.30)',
-    gradient: 'linear-gradient(135deg,#7c3aed,#c084fc)',
-  },
-  {
-    id: 'cat3', route: '/category3', icon: MapPin,
-    label: 'Nearby Doctors', sub: 'Neurologists & epilepsy specialists',
-    color: '#34d399', glow: 'rgba(52,211,153,0.30)',
-    gradient: 'linear-gradient(135deg,#059669,#34d399)',
+    id: 'doc-records', route: '/doctor-records', icon: Users,
+    label: 'User Records', sub: 'View patient profiles and reports',
+    color: '#8b5cf6', glow: 'rgba(139,92,246,0.30)',
+    gradient: 'linear-gradient(135deg,#7c3aed,#8b5cf6)',
   },
 ];
 
-export default function DashboardHub() {
+export default function DoctorDashboardHub() {
   const navigate = useNavigate();
-  const username = localStorage.getItem('epichat_username') || 'User';
-  const token = localStorage.getItem('epichat_token');
-
-  const [stats, setStats] = React.useState({
-    uploads: 0,
-    risk: '—',
-    confidence: '—',
-    isFirstLogin: false
+  const username = localStorage.getItem('epichat_username') || 'Doctor';
+  
+  const [stats, setStats] = useState({
+    pending: '—',
+    total: '—',
   });
 
-  React.useEffect(() => {
+  useEffect(() => {
+    const token = localStorage.getItem('epichat_token');
     if (!token) return;
-    fetch('http://127.0.0.1:8000/api/history', {
+    fetch(`${API_BASE}/api/doctor/patients`, {
       headers: { 'Authorization': `Bearer ${token}` }
     })
     .then(r => r.json())
     .then(data => {
-      if (data.history) {
-        const hist = data.history;
-        if (hist.length === 0) {
-          setStats({ uploads: 0, risk: '—', confidence: '—', isFirstLogin: true });
-        } else {
-          const last = hist[hist.length - 1]; // Assuming ordered by upload_time ascending
-          const riskLabel = last.classification_result || last.result_label || '—';
-          const conf = last.confidence != null ? `${Number(last.confidence).toFixed(1)}%` : '—';
-          setStats({
-            uploads: hist.length,
-            risk: riskLabel,
-            confidence: conf,
-            isFirstLogin: false
-          });
-        }
+      if (Array.isArray(data)) {
+        const pending = data.filter(s => !s.reviewed).length;
+        const total = new Set(data.map(s => s.patient_username || s.patient_name)).size;
+        setStats({
+          pending,
+          total
+        });
       }
     })
     .catch(console.error);
-  }, [token]);
+  }, []);
 
   const STAT_ITEMS = [
-    { label: 'Risk Level',    value: stats.risk,    icon: TrendingUp,  color: '#34d399', sub: 'Last EEG analysis' },
-    { label: 'Seizure Risk',  value: stats.confidence,    icon: AlertCircle, color: '#f59e0b', sub: 'Confidence score'  },
-    { label: 'EEG Sessions',  value: stats.uploads === 0 ? '—' : stats.uploads,      icon: Activity,    color: '#818cf8', sub: 'Total uploads'      },
+    { label: 'Pending Reviews',  value: stats.pending, icon: AlertCircle, color: '#f59e0b', sub: 'Awaiting your analysis'  },
+    { label: 'Total Patients',   value: stats.total,   icon: Users,       color: '#3b82f6', sub: 'Registered users'      },
+    { label: 'System Status',    value: 'Online',      icon: Activity,    color: '#10b981', sub: 'All systems go'      },
   ];
 
   return (
     <div style={{ maxWidth: 1200, margin: '0 auto' }}>
-
       {/* ── Welcome banner ────────────────────────────────────────── */}
       <div style={{
-        background: 'linear-gradient(135deg, rgba(99,102,241,0.14) 0%, rgba(192,132,252,0.10) 100%)',
-        border: '1px solid rgba(129,140,248,0.18)',
+        background: 'linear-gradient(135deg, rgba(59,130,246,0.14) 0%, rgba(14,165,233,0.10) 100%)',
+        border: '1px solid rgba(59,130,246,0.18)',
         borderRadius: 20, padding: '24px 28px', marginBottom: 28,
         display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16,
       }}>
         <div>
           <h2 className="title" style={{ fontSize: '1.8rem', fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>
-            {stats.isFirstLogin ? (
-              <>Welcome to <span className="gradient-animate">EpiChat</span> 👋</>
-            ) : (
-              <>Welcome back, <span className="gradient-animate">{username}</span> 👋</>
-            )}
+            Welcome back, Dr. <span className="gradient-animate" style={{ backgroundImage: 'linear-gradient(135deg,#3b82f6,#0ea5e9)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>{username}</span> 👋
           </h2>
           <p style={{ color: 'var(--text-secondary)', marginTop: 6, fontSize: '0.95rem' }}>
-            Your neural diagnostics platform is ready. Select a module to begin.
+            Your neural diagnostics portal is ready. Select a module to begin reviewing patient records.
           </p>
         </div>
         <div style={{
           width: 52, height: 52, borderRadius: '50%',
-          background: 'linear-gradient(135deg,#6366f1,#c084fc)',
+          background: 'linear-gradient(135deg,#3b82f6,#0ea5e9)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          boxShadow: '0 8px 24px rgba(99,102,241,0.4)',
+          boxShadow: '0 8px 24px rgba(59,130,246,0.4)',
           fontSize: '1.5rem',
         }}>
-          🧠
+          🩺
         </div>
       </div>
 
@@ -132,7 +112,7 @@ export default function DashboardHub() {
             return (
               <button
                 key={card.id}
-                id={`dashboard-btn-${card.id}`}
+                id={`doc-dashboard-btn-${card.id}`}
                 onClick={() => navigate(card.route)}
                 className="dashboard-card"
                 style={{
@@ -194,11 +174,6 @@ export default function DashboardHub() {
             );
           })}
         </div>
-      </div>
-
-      {/* ── Footer note ───────────────────────────────────────────── */}
-      <div style={{ textAlign: 'center', paddingTop: 24, color: 'var(--text-secondary)', fontSize: '0.78rem', opacity: 0.7 }}>
-        EpiChat Portal · v2.0 · AI-powered epilepsy management · Use the chat widget (bottom right) for instant guidance
       </div>
     </div>
   );

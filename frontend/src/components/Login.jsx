@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Brain, Mail, Lock, User, ArrowRight, Eye, EyeOff, AlertCircle } from 'lucide-react';
+import { Brain, Mail, Lock, User, ArrowRight, Eye, EyeOff, AlertCircle, Activity } from 'lucide-react';
 
-// ── local helper removed dynamically ──────────────────────
 import { API_BASE } from '../lib/api';
 
 function validateEmail(val) {
@@ -10,6 +9,7 @@ function validateEmail(val) {
 }
 
 export default function Login() {
+  const [role, setRole]           = useState('user'); // 'user' or 'doctor'
   const [username, setUsername]   = useState('');
   const [email,    setEmail]      = useState('');
   const [password, setPassword]   = useState('');
@@ -43,7 +43,8 @@ export default function Login() {
         body: JSON.stringify({
           username: user,
           email: email.trim().toLowerCase(),
-          password: password
+          password: password,
+          role: role
         })
       });
 
@@ -57,36 +58,67 @@ export default function Login() {
       localStorage.setItem('epichat_token', data.access_token);
       localStorage.setItem('epichat_username', data.username);
       localStorage.setItem('epichat_email', email.trim().toLowerCase());
-      localStorage.setItem('epichat_role', 'patient');
-      navigate('/dashboard');
+      localStorage.setItem('epichat_role', data.role || role);
+      
+      if (data.role === 'doctor' || role === 'doctor') {
+        navigate('/doctor-dashboard');
+      } else {
+        navigate('/dashboard');
+      }
       
     } catch (err) {
       setErrors({ password: err.message });
       const btn = document.getElementById('login-submit');
-      if (btn) btn.innerHTML = 'Enter EpiChat Portal';
+      if (btn) btn.innerHTML = role === 'doctor' ? 'Enter Doctor Portal' : 'Enter Patient Portal';
     }
   };
 
-  return (
-    <div className="app-canvas flex-center">
-      <div className="orb orb-pink" />
-      <div className="orb orb-blue" />
+  const isDoctor = role === 'doctor';
+  const primaryGradient = isDoctor ? 'linear-gradient(135deg,#3b82f6,#0ea5e9)' : 'linear-gradient(135deg,#6366f1,#c084fc)';
+  const shadowColor = isDoctor ? 'rgba(14,165,233,0.45)' : 'rgba(192,132,252,0.45)';
 
-      <div className="glass-panel login-card slide-up">
+  return (
+    <div className="app-canvas flex-center" style={{ '--primary-glow': shadowColor, transition: 'all 0.3s' }}>
+      <div className={`orb ${isDoctor ? 'orb-blue' : 'orb-pink'}`} />
+      <div className="orb orb-blue" style={{ bottom: '-10%', right: '-5%' }} />
+
+      <div className="glass-panel login-card slide-up" style={{ 
+        boxShadow: isDoctor ? '0 10px 40px rgba(14,165,233,0.1)' : '0 10px 40px rgba(192,132,252,0.1)',
+        border: isDoctor ? '1px solid rgba(14,165,233,0.2)' : '1px solid rgba(192,132,252,0.2)'
+      }}>
         {/* LOGO */}
-        <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+        <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
           <div style={{
             width: 72, height: 72, borderRadius: '50%',
-            background: 'linear-gradient(135deg,#6366f1,#c084fc)',
+            background: primaryGradient,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            margin: '0 auto 1rem', boxShadow: '0 0 32px rgba(192,132,252,0.45)',
+            margin: '0 auto 1rem', boxShadow: `0 0 32px ${shadowColor}`,
+            transition: 'all 0.3s'
           }}>
-            <Brain size={36} color="white" />
+            {isDoctor ? <Activity size={36} color="white" /> : <Brain size={36} color="white" />}
           </div>
-          <h1 className="title neon-text" style={{ fontSize: '2.6rem', margin: 0 }}>EpiChat</h1>
-          <p style={{ color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '3px', fontSize: '0.8rem', marginTop: 6 }}>
-            Neural Net OS · EpiChat Portal
+          <h1 className="title neon-text" style={{ fontSize: '2.4rem', margin: 0, textShadow: isDoctor ? '0 0 10px rgba(14,165,233,0.5)' : undefined }}>EpiChat</h1>
+          <p style={{ color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '3px', fontSize: '0.75rem', marginTop: 6 }}>
+            Neural Net OS · {isDoctor ? 'Doctor Portal' : 'Patient Portal'}
           </p>
+        </div>
+
+        {/* ROLE TABS */}
+        <div style={{ display: 'flex', background: 'rgba(255,255,255,0.05)', borderRadius: 12, padding: 4, marginBottom: 20 }}>
+          <button 
+            type="button"
+            onClick={() => { setRole('user'); setErrors({}); }}
+            style={{ flex: 1, padding: '10px 0', borderRadius: 8, background: !isDoctor ? primaryGradient : 'transparent', color: !isDoctor ? 'white' : 'var(--text-secondary)', fontWeight: 600, border: 'none', cursor: 'pointer', transition: 'all 0.2s', fontSize: '0.9rem' }}
+          >
+            Patient
+          </button>
+          <button 
+            type="button"
+            onClick={() => { setRole('doctor'); setErrors({}); }}
+            style={{ flex: 1, padding: '10px 0', borderRadius: 8, background: isDoctor ? primaryGradient : 'transparent', color: isDoctor ? 'white' : 'var(--text-secondary)', fontWeight: 600, border: 'none', cursor: 'pointer', transition: 'all 0.2s', fontSize: '0.9rem' }}
+          >
+            Doctor
+          </button>
         </div>
 
         <form onSubmit={handleLogin} noValidate style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -99,7 +131,7 @@ export default function Login() {
                 id="login-username"
                 type="text"
                 className="premium-input"
-                placeholder="Username"
+                placeholder={isDoctor ? "Doctor ID / Username" : "Username"}
                 value={username}
                 onChange={(e) => { setUsername(e.target.value); setErrors(p => ({ ...p, username: '' })); }}
                 style={{ paddingLeft: 44 }}
@@ -116,7 +148,7 @@ export default function Login() {
                 id="login-email"
                 type="email"
                 className="premium-input"
-                placeholder="Email address"
+                placeholder={isDoctor ? "Professional Email" : "Email address"}
                 value={email}
                 onChange={(e) => { setEmail(e.target.value); setErrors(p => ({ ...p, email: '' })); }}
                 style={{ paddingLeft: 44 }}
@@ -133,7 +165,7 @@ export default function Login() {
                 id="login-password"
                 type={showPwd ? 'text' : 'password'}
                 className="premium-input"
-                placeholder="Password (min. 6 characters)"
+                placeholder={isDoctor ? "Secure Password" : "Password (min. 6 characters)"}
                 value={password}
                 onChange={(e) => { setPassword(e.target.value); setErrors(p => ({ ...p, password: '' })); }}
                 style={{ paddingLeft: 44, paddingRight: 48 }}
@@ -149,14 +181,23 @@ export default function Login() {
             {errors.password && <ErrMsg msg={errors.password} />}
           </div>
 
-          <button type="submit" className="btn-primary login-submit-btn" id="login-submit" style={{ marginTop: 8 }}>
-            Enter EpiChat Portal <ArrowRight size={18} style={{ marginLeft: 8 }} />
+          <button 
+            type="submit" 
+            className="btn-primary login-submit-btn" 
+            id="login-submit" 
+            style={{ 
+              marginTop: 8, 
+              background: primaryGradient,
+              boxShadow: `0 4px 14px ${shadowColor}`
+            }}
+          >
+            {isDoctor ? 'Enter Doctor Portal' : 'Enter Patient Portal'} <ArrowRight size={18} style={{ marginLeft: 8 }} />
           </button>
         </form>
 
         <p style={{ color: 'var(--text-secondary)', fontSize: '0.78rem', textAlign: 'center', marginTop: '1.5rem', lineHeight: 1.6 }}>
-          By signing in you agree to EpiChat's terms of service.
-          <br />This portal is for authorized patients only.
+          {isDoctor ? 'Authorized medical personnel only.' : 'By signing in you agree to EpiChat\'s terms of service.'}
+          <br />This portal is for authorized {isDoctor ? 'providers' : 'patients'} only.
         </p>
       </div>
     </div>

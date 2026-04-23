@@ -9,9 +9,9 @@ import EEGMonitor from './EEGMonitor';
 import ResultsCard from './ResultsCard';
 import RiskTimeline from './RiskTimeline';
 import Brain3D from './Brain3D';
-import { apiJson } from '../lib/api';
-
-// ── server handles history now ──────────────────────────────────────────────
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import { apiJson, formatGlobalTime } from '../lib/api';
 
 // ── clean analyzing loader ──────────────────────────────────────────────────
 function AnalyzingLoader() {
@@ -125,7 +125,7 @@ function PatientProfileCard({ username, email, fullName }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 10 }}>
           <ShieldCheck size={14} style={{ color: '#818cf8' }} />
           <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#818cf8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-            Patient Profile
+            User Profile
           </span>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
@@ -156,10 +156,12 @@ export default function Category2() {
   const navigate = useNavigate();
   const inputRef = useRef(null);
 
+  const role = localStorage.getItem('epichat_role') || 'user';
+  const isDoctor = role === 'doctor';
+
   // ── Session data (read-only, from login) ────────────────────────────────
   const sessionUsername = localStorage.getItem('epichat_username') || '';
   const sessionEmail    = localStorage.getItem('epichat_email')    || '';
-  // Full name stored under the users map (username → { email, ... })
   const sessionFullName = (() => {
     try {
       const all = JSON.parse(localStorage.getItem('epichat_users') || '{}');
@@ -167,7 +169,10 @@ export default function Category2() {
     } catch (_) { return ''; }
   })();
 
-  // ── Editable fields only ─────────────────────────────────────────────────
+  // ── Editable fields ──────────────────────────────────────────────────────
+  const [patientUsername, setPatientUsername] = useState(isDoctor ? '' : sessionUsername);
+  const [patientName, setPatientName] = useState(isDoctor ? '' : sessionFullName || sessionUsername);
+  
   const [age,    setAge]    = useState(20);
   const [gender, setGender] = useState('Male');
   const [file, setFile] = useState(null);
@@ -189,10 +194,10 @@ export default function Category2() {
     return () => cancelAnimationFrame(raf);
   }, [status]);
 
-  // canSubmit: session username required + EDF file
+  // canSubmit: username/name required + EDF file
   const canSubmit = useMemo(() =>
-    sessionUsername && gender && Number(age) >= 0 && file,
-  [age, gender, file, sessionUsername]);
+    patientUsername && patientName && gender && Number(age) >= 0 && file,
+  [age, gender, file, patientUsername, patientName]);
 
   const onPickFile = (f) => {
     if (!f) return;
@@ -210,8 +215,8 @@ export default function Category2() {
     setFadeIn(false);
 
     const fd = new FormData();
-    fd.append('username', sessionUsername);
-    fd.append('name',     sessionFullName || sessionUsername);
+    fd.append('username', patientUsername);
+    fd.append('name',     patientName);
     fd.append('age',      String(age));
     fd.append('gender',   gender);
     fd.append('file', file);
@@ -229,8 +234,71 @@ export default function Category2() {
       setTimeout(() => setFadeIn(true), 80);
     } catch (e) {
       console.error(e);
-      alert(`Submit failed: ${e.message}`);
+      alert('Unable to process file. Please retry.');
       setStatus('idle');
+    }
+  };
+
+  const downloadPDF = () => {
+    if (!submission) return;
+    try {
+      const doc = new jsPDF();
+      doc.setFontSize(22);
+      doc.setTextColor(isDoctor ? 14 : 79, isDoctor ? 165 : 70, isDoctor ? 233 : 229);
+      doc.text('EpiChat Medical Report', 14, 20);
+      doc.setFontSize(10);
+      doc.setTextColor(100);
+      doc.text(`Generated on: ${formatGlobalTime(new Date().toISOString())}`, 14, 28);
+      doc.setDrawColor(200);
+      doc.line(14, 32, 196, 32);
+
+      doc.setFontSize(14);
+      doc.setTextColor(0);
+      doc.text('Patient Information', 14, 42);
+      autoTable(doc, {
+        startY: 46,
+        head: [['Field', 'Details']],
+        body: [
+          ['Name', String(patientName)],
+          ['Username', String(patientUsername)],
+          ['Age', String(age)],
+          ['Gender', String(gender)],
+          ['Upload Date', String(formatGlobalTime(submission.created_at || new Date().toISOString()))],
+          ['File Name', String(submission.file_name || 'EEG Recording')]
+        ],
+        theme: 'grid',
+        headStyles: { fillColor: isDoctor ? [14, 165, 233] : [79, 70, 229] }
+      });
+
+      const finalY = doc.lastAutoTable.finalY || 80;
+      doc.setFontSize(14);
+      doc.text('Analysis Results', 14, finalY + 14);
+
+      const severity = submission.result_label === 'Ictal' ? 'High' : submission.result_label === 'Pre-ictal' ? 'Medium' : 'Low';
+      autoTable(doc, {
+        startY: finalY + 18,
+        head: [['Metric', 'Result']],
+        body: [
+          ['Risk Level', String(submission.result_label || 'Unknown')],
+          ['Confidence', `${Number(submission.confidence || 0).toFixed(1)}%`],
+          ['Severity', String(severity)],
+          ['AI Explanation', `Detected patterns corresponding to ${severity.toLowerCase()} risk. Regular monitoring is advised.`]
+        ],
+        theme: 'grid',
+        headStyles: { fillColor: isDoctor ? [14, 165, 233] : [79, 70, 229] }
+      });
+
+      const disclaimerY = doc.lastAutoTable.finalY + 20;
+      doc.setFontSize(10);
+      doc.setTextColor(150, 0, 0);
+      const disclaimer = "DISCLAIMER: This report is generated by EpiChat AI for informational purposes only. It is not a formal medical diagnosis. Always consult a qualified neurologist or healthcare provider for medical advice.";
+      const splitDisclaimer = doc.splitTextToSize(disclaimer, 180);
+      doc.text(splitDisclaimer, 14, disclaimerY);
+
+      doc.save(`EpiChat_Report_${patientName.replace(/\s+/g, '_')}_${formatGlobalTime(submission.created_at || new Date().toISOString()).replace(/\W+/g, '')}.pdf`);
+    } catch (e) {
+      console.error(e);
+      alert("Failed to generate PDF.");
     }
   };
 
@@ -245,7 +313,7 @@ export default function Category2() {
           <Activity size={24} className="neon-icon" />
           <h1 className="title neon-text" style={{ fontSize: '1.4rem', margin: 0 }}>EEG Detection</h1>
         </div>
-        <button className="btn-secondary nav-btn" id="cat2-back-btn" onClick={() => navigate('/dashboard')}>
+        <button className="btn-secondary nav-btn" id="cat2-back-btn" onClick={() => navigate(isDoctor ? '/doctor-dashboard' : '/dashboard')}>
           <ArrowLeft size={16} style={{ marginRight: 8 }} /> Back to Dashboard
         </button>
       </nav>
@@ -255,26 +323,51 @@ export default function Category2() {
         {/* ── UPLOAD FORM ─────────────────────────────────────────────── */}
         <div className="glass-panel" style={{ padding: 20 }}>
           <div className="neon-text" style={{ fontWeight: 800, marginBottom: 14, fontSize: '1.1rem' }}>
-            📋 Patient Input
+            📋 {isDoctor ? 'Patient Details' : 'User Input'}
           </div>
 
-          {/* ── READ-ONLY PATIENT PROFILE ──────────────────────────────── */}
-          <PatientProfileCard
-            username={sessionUsername}
-            email={sessionEmail}
-            fullName={sessionFullName}
-          />
+          {/* ── PATIENT PROFILE / INPUTS ───────────────────────────────── */}
+          {isDoctor ? (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 10, marginBottom: 14 }}>
+              <input
+                className="premium-input"
+                type="text"
+                placeholder="Patient Full Name"
+                value={patientName}
+                onChange={e => setPatientName(e.target.value)}
+              />
+              <input
+                className="premium-input"
+                type="text"
+                placeholder="Patient ID / Username"
+                value={patientUsername}
+                onChange={e => setPatientUsername(e.target.value)}
+              />
+            </div>
+          ) : (
+            <PatientProfileCard
+              username={sessionUsername}
+              email={sessionEmail}
+              fullName={sessionFullName}
+            />
+          )}
 
-          {/* ── EDITABLE FIELDS ────────────────────────────────────────── */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 10, marginTop: 14 }}>
+          {/* ── AGE/GENDER ────────────────────────────────────────────── */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 10, marginTop: isDoctor ? 0 : 14 }}>
             <input
               className="premium-input"
               type="number"
-              min="0"
-              max="130"
+              min="1"
+              max="120"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              onWheel={(e) => e.target.blur()}
               placeholder="Age"
               value={age}
-              onChange={e => setAge(Number(e.target.value))}
+              onChange={e => {
+                const val = e.target.value.replace(/\D/g, '');
+                setAge(val ? Number(val) : '');
+              }}
             />
             <select
               className="premium-input"
@@ -309,6 +402,7 @@ export default function Category2() {
               onClick={submit}
               disabled={!canSubmit || status === 'analyzing'}
               id="cat2-submit-btn"
+              style={isDoctor ? { background: 'linear-gradient(135deg,#3b82f6,#0ea5e9)', boxShadow: '0 4px 14px rgba(14,165,233,0.35)' } : {}}
             >
               {status === 'analyzing' ? 'Analyzing…' : 'Submit for Analysis'}
             </button>
@@ -372,11 +466,16 @@ export default function Category2() {
             {/* Actions */}
             <div style={{ textAlign: 'center', padding: '0.5rem 0' }}>
               <p style={{ color: 'var(--success)', marginBottom: 12, fontSize: '0.9rem' }}>
-                ✓ Results saved to your history (User History)
+                ✓ Results saved to {isDoctor ? 'patient' : 'your'} history
               </p>
-              <button className="btn-secondary" onClick={() => { setStatus('idle'); setSubmission(null); }}>
-                Run Another Analysis
-              </button>
+              <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+                <button className="btn-secondary" onClick={() => { setStatus('idle'); setSubmission(null); setFile(null); }}>
+                  Run Another Analysis
+                </button>
+                <button className="btn-primary" onClick={downloadPDF} style={isDoctor ? { background: 'linear-gradient(135deg,#3b82f6,#0ea5e9)', boxShadow: '0 4px 14px rgba(14,165,233,0.35)' } : {}}>
+                  Download PDF Report
+                </button>
+              </div>
             </div>
 
             {/* Disclaimer */}

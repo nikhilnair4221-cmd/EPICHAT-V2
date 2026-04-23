@@ -1,16 +1,18 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import { ThemeToggleSwitch } from './ThemeToggle';
 import FloatingChatbot from './FloatingChatbot';
-import { Brain, User } from 'lucide-react';
 
 // Map route → display title
 const PAGE_TITLES = {
   '/dashboard': 'Dashboard',
+  '/doctor-dashboard': 'Doctor Dashboard',
   '/category1': 'User History',
   '/category2': 'EEG Detection',
+  '/doctor-eeg': 'EEG Detection',
   '/category3': 'Nearby Doctors',
+  '/doctor-records': 'User Records',
   '/settings':  'Settings',
 };
 
@@ -19,7 +21,11 @@ function TopHeader() {
   const location = useLocation();
   const title    = PAGE_TITLES[location.pathname] || 'EpiChat';
   const username = localStorage.getItem('epichat_username') || 'User';
+  const role     = localStorage.getItem('epichat_role') || 'user';
+  const isDoctor = role === 'doctor';
   const initials = username.slice(0, 2).toUpperCase();
+
+  const primaryGradient = isDoctor ? 'linear-gradient(135deg,#3b82f6,#0ea5e9)' : 'linear-gradient(135deg,#6366f1,#c084fc)';
 
   return (
     <header style={{
@@ -41,7 +47,7 @@ function TopHeader() {
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
         <div style={{
           width: 8, height: 28, borderRadius: 4,
-          background: 'linear-gradient(180deg,#6366f1,#c084fc)',
+          background: primaryGradient,
         }} />
         <h1 className="title" style={{
           fontSize: '1.25rem', fontWeight: 700,
@@ -65,7 +71,7 @@ function TopHeader() {
         }}>
           <div style={{
             width: 30, height: 30, borderRadius: '50%',
-            background: 'linear-gradient(135deg,#6366f1,#c084fc)',
+            background: primaryGradient,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontSize: '0.72rem', fontWeight: 800, color: 'white',
             flexShrink: 0,
@@ -74,7 +80,7 @@ function TopHeader() {
           </div>
           <div>
             <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.2 }}>{username}</div>
-            <div style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', lineHeight: 1.2 }}>Patient</div>
+            <div style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', lineHeight: 1.2 }}>{isDoctor ? 'Doctor' : 'Patient'}</div>
           </div>
         </div>
       </div>

@@ -3,10 +3,10 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Home, ClipboardList, BrainCircuit, MapPin,
   MessageSquare, LogOut, ChevronLeft, ChevronRight, Brain,
-  Menu, X, Lightbulb, Settings, Activity,
+  Menu, X, Activity, Settings,
 } from 'lucide-react';
 
-const NAV_SECTIONS = [
+const USER_NAV_SECTIONS = [
   {
     label: 'Main',
     items: [
@@ -24,7 +24,24 @@ const NAV_SECTIONS = [
   },
 ];
 
-function NavItem({ item, isActive, collapsed, onNavigate }) {
+const DOCTOR_NAV_SECTIONS = [
+  {
+    label: 'Main',
+    items: [
+      { id: 'doctor-dashboard', label: 'Dashboard Home',  icon: Home,          route: '/doctor-dashboard' },
+      { id: 'doctor-eeg',       label: 'EEG Detection',   icon: BrainCircuit,  route: '/doctor-eeg' },
+      { id: 'doctor-records',   label: 'User Records',    icon: ClipboardList, route: '/doctor-records' },
+    ],
+  },
+  {
+    label: 'Tools',
+    items: [
+      { id: 'chat',    label: 'AI Assistant',    icon: MessageSquare, route: null, action: 'chat' },
+    ],
+  },
+];
+
+function NavItem({ item, isActive, collapsed, onNavigate, activeGradient, activeBorderColor, activeTextColor }) {
   const [hov, setHov] = useState(false);
   const Icon = item.icon;
   const active = isActive && item.route;
@@ -40,12 +57,12 @@ function NavItem({ item, isActive, collapsed, onNavigate }) {
         padding: collapsed ? '10px 0' : '10px 16px',
         justifyContent: collapsed ? 'center' : 'flex-start',
         background: active
-          ? 'linear-gradient(135deg,rgba(99,102,241,0.18),rgba(192,132,252,0.09))'
+          ? activeGradient
           : hov ? 'rgba(255,255,255,0.045)' : 'transparent',
         border: 'none',
-        borderLeft: active ? '3px solid #818cf8' : '3px solid transparent',
+        borderLeft: active ? `3px solid ${activeBorderColor}` : '3px solid transparent',
         borderRadius: '0 10px 10px 0',
-        color: active ? 'var(--accent)' : hov ? 'var(--text-primary)' : 'var(--text-secondary)',
+        color: active ? activeTextColor : hov ? 'var(--text-primary)' : 'var(--text-secondary)',
         cursor: 'pointer',
         fontFamily: 'inherit',
         fontSize: '0.875rem',
@@ -70,6 +87,10 @@ export default function Sidebar() {
   const [collapsed, setCollapsed]   = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
+  const role = localStorage.getItem('epichat_role') || 'user';
+  const isDoctor = role === 'doctor';
+  const NAV_SECTIONS = isDoctor ? DOCTOR_NAV_SECTIONS : USER_NAV_SECTIONS;
+
   const handleLogout = () => { localStorage.clear(); navigate('/login'); };
 
   const onNavigate = (item) => {
@@ -80,6 +101,12 @@ export default function Sidebar() {
     }
     if (item.route) navigate(item.route);
   };
+
+  const primaryGradient = isDoctor ? 'linear-gradient(135deg,#3b82f6,#0ea5e9)' : 'linear-gradient(135deg,#6366f1,#c084fc)';
+  const shadowColor = isDoctor ? 'rgba(14,165,233,0.4)' : 'rgba(99,102,241,0.4)';
+  const activeGradient = isDoctor ? 'linear-gradient(135deg,rgba(59,130,246,0.18),rgba(14,165,233,0.09))' : 'linear-gradient(135deg,rgba(99,102,241,0.18),rgba(192,132,252,0.09))';
+  const activeBorderColor = isDoctor ? '#3b82f6' : '#818cf8';
+  const activeTextColor = isDoctor ? '#38bdf8' : 'var(--accent)';
 
   const w = collapsed ? 68 : 248;
 
@@ -110,26 +137,28 @@ export default function Sidebar() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={{
               width: 34, height: 34, borderRadius: 10, flexShrink: 0,
-              background: 'linear-gradient(135deg,#6366f1,#c084fc)',
+              background: primaryGradient,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              boxShadow: '0 4px 12px rgba(99,102,241,0.4)',
+              boxShadow: `0 4px 12px ${shadowColor}`,
             }}>
-              <Brain size={18} color="white" />
+              {isDoctor ? <Activity size={18} color="white" /> : <Brain size={18} color="white" />}
             </div>
             <div>
               <div className="title" style={{ fontWeight: 800, fontSize: '1rem', color: 'var(--text-primary)', lineHeight: 1.2 }}>EpiChat</div>
-              <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', lineHeight: 1.2 }}>Neural Diagnostics</div>
+              <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', lineHeight: 1.2 }}>
+                {isDoctor ? 'Doctor Portal' : 'Neural Diagnostics'}
+              </div>
             </div>
           </div>
         )}
         {collapsed && (
           <div style={{
             width: 36, height: 36, borderRadius: 10,
-            background: 'linear-gradient(135deg,#6366f1,#c084fc)',
+            background: primaryGradient,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 4px 12px rgba(99,102,241,0.4)',
+            boxShadow: `0 4px 12px ${shadowColor}`,
           }}>
-            <Brain size={18} color="white" />
+            {isDoctor ? <Activity size={18} color="white" /> : <Brain size={18} color="white" />}
           </div>
         )}
         <button
@@ -167,6 +196,9 @@ export default function Sidebar() {
                 isActive={location.pathname === item.route}
                 collapsed={collapsed}
                 onNavigate={onNavigate}
+                activeGradient={activeGradient}
+                activeBorderColor={activeBorderColor}
+                activeTextColor={activeTextColor}
               />
             ))}
           </div>

@@ -14,6 +14,7 @@ class User(Base):
     username: Mapped[str] = mapped_column(String(255), unique=True, index=True)
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
     password: Mapped[str] = mapped_column(String(255))
+    role: Mapped[str] = mapped_column(String(32), default="user")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     eeg_records: Mapped[list["EEGHistory"]] = relationship(

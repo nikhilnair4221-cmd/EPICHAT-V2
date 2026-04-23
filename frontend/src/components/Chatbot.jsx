@@ -31,13 +31,19 @@ function TypingIndicator() {
 // Main Chatbot component
 // ─────────────────────────────────────────────────────────────────────────────
 export default function Chatbot({ onClose }) {
-  const [messages, setMessages] = useState([
-    {
-      id: 1,
-      role: 'assistant',
-      text: "Hello! I'm EpiChat AI — your epilepsy & EEG assistant. Ask me anything about seizure results, precautions, medications, or first aid. How can I help you today?",
-    },
-  ]);
+  const DEFAULT_MESSAGE = {
+    id: 1,
+    role: 'assistant',
+    text: "Hello! I'm EpiChat AI — your epilepsy & EEG assistant. Ask me anything about seizure results, precautions, medications, or first aid. How can I help you today?",
+  };
+
+  const [messages, setMessages] = useState(() => {
+    try {
+      const saved = localStorage.getItem('epichat_messages');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    return [DEFAULT_MESSAGE];
+  });
   const [inputVal,  setInputVal]  = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isListening, setIsListening] = useState(false);
@@ -51,6 +57,20 @@ export default function Chatbot({ onClose }) {
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isLoading]);
+
+  // Persist messages
+  useEffect(() => {
+    localStorage.setItem('epichat_messages', JSON.stringify(messages));
+  }, [messages]);
+
+  // Listen for clear chat event
+  useEffect(() => {
+    const handleClear = () => {
+      setMessages([DEFAULT_MESSAGE]);
+    };
+    window.addEventListener('chat_cleared', handleClear);
+    return () => window.removeEventListener('chat_cleared', handleClear);
+  }, []);
 
   // ── Speech Recognition Setup ───────────────────────────────────────────────
   useEffect(() => {
@@ -116,9 +136,11 @@ export default function Chatbot({ onClose }) {
 
   // ── Send message to backend proxy ──────────────────────────────────────────
   const sendToBackend = async (text, history) => {
-    // Build conversation in the format the backend expects: { message, history }
+    // Build conversation in the format the backend expects: { message, role, history }
+    const role = localStorage.getItem('epichat_role') || 'user';
     const payload = {
       message: text,
+      role: role,
       history: history.map(m => ({
         role:    m.role === 'assistant' ? 'assistant' : 'user',
         text:    m.text,

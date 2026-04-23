@@ -56,3 +56,4 @@ logs/
 .env
 *.db
 *.sqlite
+backend/app/data/uploads/*.edf

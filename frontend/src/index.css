@@ -41,7 +41,7 @@ html {
   /* Stronger contrast text */
   --text-primary: #111827;
   --text-secondary: #374151;
-  --text-label: #4b5563;
+  --text-label: #6b7280;
   --text-numbers: #0f172a;
 
   --accent: #4f46e5;
@@ -82,9 +82,9 @@ html, body, .glass-panel, .dashboard-nav, .chatbot-container,
 }
 
 [data-theme="light"] .glass-panel {
-  background: rgba(255,255,255,0.96);
+  background: #ffffff;
   border: 1px solid rgba(99,102,241,0.16);
-  box-shadow: 0 4px 24px rgba(99,102,241,0.10), 0 1px 4px rgba(0,0,0,0.06);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
 }
 
 [data-theme="light"] .premium-input {
@@ -649,4 +649,14 @@ h1.title, h2.title, h3.title {
 
 @media (max-width: 600px) {
   .floating-chat-window { width: calc(100vw - 40px); right: 20px; height: 500px; bottom: 100px; }
+}
+
+/* Hide number spinner arrows */
+input[type="number"]::-webkit-inner-spin-button, 
+input[type="number"]::-webkit-outer-spin-button { 
+  -webkit-appearance: none; 
+  margin: 0; 
+}
+input[type="number"] {
+  -moz-appearance: textfield;
 }
